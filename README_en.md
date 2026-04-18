@@ -8,11 +8,23 @@
 
 ---
 
-## Background
+## Design Philosophy
 
-CausaMem is an **independently developed** AI Agent memory system created by Vinson and AI Agent 牛马2号.
+**Memory is not about accumulation—it's about how you remember.**
 
-Core philosophy: Give AI agents human-like memory capabilities.
+A human's lifetime memory is roughly 1 million characters. An AI agent's context window is larger (2 million characters). But stacking information isn't effective memory. The real question is: **How do you make memory work like a human's—connecting dots into lines, lines into planes, forming a traceable, reasoning-enabled causal network?**
+
+CausaMem's answer: **Four-Layer Structured Memory + Causal Reasoning**
+
+```
+Event (dot) → Timeline (line) → Relation (plane) → Abstract (attribution)
+```
+
+Each layer is an abstraction of the layer below—not data accumulation, but building a **dot-to-plane attribution memory system**.
+
+Add **cause** and **effect** automatic inference, so every event is no longer isolated, but a node in the causal network.
+
+---
 
 ## Core Features
 
@@ -56,7 +68,7 @@ wiki/
 ├── events/        # Event layer: who+what+result+emotion
 ├── timeline/      # Timeline layer: chronological
 ├── relations/     # Relation layer: causal/correlated
-└── _dream/      # Abstract layer: dream output
+└── _dream/       # Abstract layer: dream output
 ```
 
 ### 5. Dream Abstraction (Cron)
@@ -73,6 +85,8 @@ Organize memories by type: `DECISION` | `INSIGHT` | `BUG` | `FEATURE` | `CHANGE`
 ### 7. Multi-Agent Sharing
 Filesystem-based storage, multiple agents can access simultaneously.
 
+---
+
 ## Architecture
 
 ```
@@ -83,6 +97,8 @@ AI Agent
   ├── wiki/                           (4-layer wiki)
   └── Dream Cron                      (causal abstraction)
 ```
+
+---
 
 ## Quick Start
 
@@ -116,6 +132,8 @@ crontab -e
 0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
 
+---
+
 ## Project Structure
 
 ```
@@ -136,6 +154,8 @@ MHH-Causality-Memory/
     ├── timeline/
     └── relations/
 ```
+
+---
 
 ## License
 
