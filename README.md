@@ -276,3 +276,44 @@ For details, see [LICENSE](LICENSE) file.
 
 - [Vinson](https://github.com/MaiHHConnect)
 - [牛马2号](https://github.com/openclaw) (AI Agent)
+
+---
+
+## 社区衍生版本
+
+### 浩哥助手改造版
+
+基于 CausaMem 框架，浩哥助手进行了以下增强集成：
+
+| 功能 | 说明 | 状态 |
+|------|------|------|
+| OpenClaw集成 | 与memory_search深度集成，memory_search自动触发gbrain兜底 | ✅ |
+| 双向链接格式 | Wiki格式 `[[因果→]]` / `[[因果←]]` | ✅ |
+| 记忆触发记录 | recall_count跟踪，高频记忆自动提拔到长期记忆 | ✅ |
+| OpenClaw做梦 | 集成OpenClaw内置做梦系统，自动抽象总结 | ✅ |
+
+**部署情况：**
+```bash
+# gbrain 位置
+~/gbrain-data/gbrain.py
+
+# 已导入记忆：48个页面，45个向量
+gbrain.py stats
+
+# 向量搜索测试
+gbrain.py query "记忆系统"
+```
+
+**特点：**
+- 保留CausaMem所有功能
+- 与OpenClaw记忆系统无缝集成
+- 利用OpenClaw内置做梦做自动抽象总结
+- Markdown格式文件人类可直接读写
+
+**相关文件：**
+- 浩哥助手记忆标准：`~/.openclaw/workspace/memory/MEMORY-STANDARD.md`
+- 因果思维特点：`~/.openclaw/workspace/memory/MEMORY-STANDARD.md`
+
+---
+
+*Built for AI Agents that remember.*
