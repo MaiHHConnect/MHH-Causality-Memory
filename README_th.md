@@ -1,40 +1,53 @@
-# CausaMem - ระบบความจำเชิงสาเหตุ
+# CausaMem - Causal Memory System
 
-> มอบความจำตลอดชีวิตให้ AI Agent ของคุณ | ระบบความจำเชิงสาเหตุสำหรับ AI Agent
+> Give your AI Agent a lifetime of memory
 
-[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [ไทย](README_th.md)
+[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [ไทย](README_th.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
-## ภูมิหลัง
+## Overview
 
-CausaMem เป็นระบบความจำอิสระสำหรับ AI Agent หลังจากพัฒนาเสร็จ เราได้อ้างอิง [Claude-Mem](https://github.com/thedotmack/claude-mem) และนำฟีเจอร์หลัก **การบีบอัดแบบมีโครงสร้างด้วย AI** มาใช้ พร้อมขยายด้วย **การให้เหตุผลเชิงสาเหตุ**
+CausaMem - Independent AI Agent memory system with three core modules:
 
-## ฟีเจอร์หลัก
+| Module | Description |
+|--------|-------------|
+| Causal Memory (gbrain) | Structured compression + Causal reasoning + 3 search modes |
+| Wiki 4-Layer | Events→Timeline→Relations→Abstractions |
+| Dream (Cron) | Periodic causal chains + Abstract judgments |
 
-| ฟีเจอร์ | คำอธิบาย |
-|---------|----------|
-| ความจำ 4 ชั้น | เหตุการณ์ → ไทม์ไลน์ → ความสัมพันธ์ → สรุป |
-| การบีบอัดแบบมีโครงสร้าง AI | แยก decided/learned/completed/next_steps อัตโนมัติ |
-| การให้เหตุผลเชิงสาเหตุ | อนุมาน cause (สาเหตุ) / effect (ผลลัพธ์) |
-| การค้นหา 3 เครื่องมือ | เวกเตอร์ + FTS5 + สายเชิงสาเหตุ |
-| Wiki ที่อ่านได้ | รูปแบบ Obsidian Wiki |
-| แท็กประเภท | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+## Architecture
 
-## เริ่มต้นอย่างรวดเร็ว
+```
+Startup Memory → SOUL.md / USER.md / MEMORY.md
+Working Memory → memory/*.md + gbrain + wiki/
+Periodic → Small(daily 02:30) + Big Dream(weekly Thu 03:00)
+```
+
+## Quick Start
 
 ```bash
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
+pip install requests
 cd scripts/gbrain
-python gbrain.py put-structured memory-2026 "เราถกเถียงเรื่องระบบความจำ ตัดสินใจใช้โครงสร้าง 4 ชั้น"
-python gbrain.py causal "ความจำ"
+python gbrain.py init
+python gbrain.py put-structured my-event "Discussed system design"
+python gbrain.py causal "system design"
 ```
 
-## เครดิต
+## Cron Setup
 
-ได้รับแรงบันดาลใจจาก [Claude-Mem](https://github.com/thedotmack/claude-mem).
+```bash
+crontab -e
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
+```
 
-## สิทธิ์การใช้งาน
+## Acknowledgments
+
+Inspired by [Claude-Mem](https://github.com/thedotmack/claude-mem).
+
+## License
 
 MIT License

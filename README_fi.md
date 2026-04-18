@@ -1,40 +1,53 @@
-# CausaMem - Kausaalinen Muistijärjestelmä
+# CausaMem - Causal Memory System
 
-> Anna AI-agentillesi elinikäinen muisti | Kausaalinen muistijärjestelmä AI-agenteille
+> Give your AI Agent a lifetime of memory
 
-[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [Suomi](README_fi.md)
+[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [Suomi](README_fi.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
-## Tausta
+## Overview
 
-CausaMem on itsenäinen muistijärjestelmä AI-agenteille. Kehityksen jälkeen viittasimme [Claude-Memiin](https://github.com/thedotmack/claude-mem) ja toteutimme sen ydinominaisuuden **AI-rakenteisen pakkauksen**, laajennettuna **kausaalisella päättelyllä**.
+CausaMem - Independent AI Agent memory system with three core modules:
 
-## Pääominaisuudet
+| Module | Description |
+|--------|-------------|
+| Causal Memory (gbrain) | Structured compression + Causal reasoning + 3 search modes |
+| Wiki 4-Layer | Events→Timeline→Relations→Abstractions |
+| Dream (Cron) | Periodic causal chains + Abstract judgments |
 
-| Ominaisuus | Kuvaus |
-|-----------|--------|
-| 4-kerroksinen muisti | Tapahtumat → Aikajana → Suhteet → Yhteenvedot |
-| AI-rakenteinen pakkaus | Poimii automaattisesti decided/learned/completed/next_steps |
-| Kausaalinen päättely | Johtaa cause (syy) / effect (seuraus) |
-| 3-moottorinen haku | Vektori + FTS5 + Kausaalinen ketju |
-| Luettava Wiki | Obsidian Wiki -muoto |
-| Tyyppi-tagit | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+## Architecture
 
-## Pika-aloitus
+```
+Startup Memory → SOUL.md / USER.md / MEMORY.md
+Working Memory → memory/*.md + gbrain + wiki/
+Periodic → Small(daily 02:30) + Big Dream(weekly Thu 03:00)
+```
+
+## Quick Start
 
 ```bash
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
+pip install requests
 cd scripts/gbrain
-python gbrain.py put-structured memory-2026 "Keskitimme muistijärjestelmästä, päätimme käyttää 4-kerroksista rakennetta"
-python gbrain.py causal "muisti"
+python gbrain.py init
+python gbrain.py put-structured my-event "Discussed system design"
+python gbrain.py causal "system design"
 ```
 
-## Kiitokset
+## Cron Setup
 
-Inspiroitunut [Claude-Mem](https://github.com/thedotmack/claude-mem):stä.
+```bash
+crontab -e
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
+```
 
-## Lisenssi
+## Acknowledgments
+
+Inspired by [Claude-Mem](https://github.com/thedotmack/claude-mem).
+
+## License
 
 MIT License

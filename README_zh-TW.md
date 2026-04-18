@@ -2,43 +2,61 @@
 
 > 讓 AI Agent 擁有一生的記憶 | Causal Memory System for AI Agents
 
-[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | 繁體中文
+[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | 繁體中文 | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [Polski](README_pl.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
 ## 專案背景
 
-CausaMem 是獨立的 AI Agent 記憶系統。在開發完成後，我們參考了 [Claude-Mem](https://github.com/thedotmack/claude-mem)，借鑒並實現了其核心的 **AI 結構化壓縮** 功能，并在此基礎上擴展了 **因果推理** 能力。
+CausaMem 是獨立的 AI Agent 記憶系統，包含三大模組：
 
-## 核心特性
-
-| 特性 | 說明 |
+| 模組 | 說明 |
 |------|------|
-| 四層記憶結構 | 事件 → 時間線 → 關係鏈 → 抽象總結 |
-| AI 結構化壓縮 | 自動提取 decided/learned/completed/next_steps |
-| 因果推理 | 自動推斷 cause（前因）/ effect（後果） |
-| 雙引擎檢索 | 向量語義搜索 + FTS5 全文搜索 + 因果鏈搜索 |
-| Wiki 人類可讀 | Obsidian Wiki 格式，可直接閱讀修改 |
-| 類型標籤 | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+| 因果記憶(gbrain) | 結構化壓縮 + 因果推論 + 3種檢索 |
+| Wiki 4層結構 | 事件→時間線→關係→抽象 |
+| 做夢(定時) | 定期因果串線 + 抽象判斷 |
+
+## 架構
+
+```
+啟動記憶 → SOUL.md / USER.md / MEMORY.md
+工作記憶 → memory/*.md + gbrain + wiki/
+定時執行 → 小整理(每日2:30) + 大做夢(每週四3:00)
+```
 
 ## 快速開始
 
 ```bash
-# 克隆
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
-
-# 寫入帶結構化壓縮的記憶
+pip install requests
 cd scripts/gbrain
-python gbrain.py put-structured memory-2026 "討論記憶系統，決定採用四層結構"
+python gbrain.py init
 
-# 因果鏈搜索
-python gbrain.py causal "記憶系統"
+# 寫入記憶
+python gbrain.py put-structured my-event "討論系統設計，決定採用X架構"
+
+# 檢索
+python gbrain.py causal "系統設計"  # 因果鏈
+python gbrain.py query "設計"       # 向量
+python gbrain.py search "架構"     # FTS5
+```
+
+## Cron設定（做夢）
+
+```bash
+crontab -e
+
+# 小整理：每日 02:30
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
+
+# 大做夢：每週四 03:00
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
 
 ## 借鑒說明
 
-本專案參考了 [Claude-Mem](https://github.com/thedotmack/claude-mem) 的 AI 結構化壓縮設計。
+參考了 [Claude-Mem](https://github.com/thedotmack/claude-mem) 的 AI 結構化壓縮。
 
 ## 授權
 

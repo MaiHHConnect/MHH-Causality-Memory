@@ -1,40 +1,53 @@
-# CausaMem - Sistema de Memória Causal
+# CausaMem - Causal Memory System
 
-> Dê ao seu Agente de IA uma memória para toda a vida | Sistema de Memória Causal para Agentes de IA
+> Give your AI Agent a lifetime of memory
 
-[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [Português](README_pt-PT.md)
+[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [Português PT](README_pt-PT.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
-## Enquadramento
+## Overview
 
-CausaMem é um sistema de memória independente para Agentes de IA. Após completar o desenvolvimento, referenciamos o [Claude-Mem](https://github.com/thedotmack/claude-mem) e implementamos a sua funcionalidade principal de **compressão estruturada por IA**, expandida com **raciocínio causal**.
+CausaMem - Independent AI Agent memory system with three core modules:
 
-## Funcionalidades Principais
+| Module | Description |
+|--------|-------------|
+| Causal Memory (gbrain) | Structured compression + Causal reasoning + 3 search modes |
+| Wiki 4-Layer | Events→Timeline→Relations→Abstractions |
+| Dream (Cron) | Periodic causal chains + Abstract judgments |
 
-| Funcionalidade | Descrição |
-|----------------|-----------|
-| Memória de 4 camadas | Eventos → Cronologia → Relações → Resumos |
-| Compressão Estruturada por IA | Extrai automaticamente decided/learned/completed/next_steps |
-| Raciocínio Causal | Infere cause (causa) / effect (consequência) |
-| Pesquisa de 3 motores | Vetor + FTS5 + Cadeia Causal |
-| Wiki Legível | Formato Obsidian Wiki |
-| Etiquetas de Tipo | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+## Architecture
 
-## Início Rápido
+```
+Startup Memory → SOUL.md / USER.md / MEMORY.md
+Working Memory → memory/*.md + gbrain + wiki/
+Periodic → Small(daily 02:30) + Big Dream(weekly Thu 03:00)
+```
+
+## Quick Start
 
 ```bash
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
+pip install requests
 cd scripts/gbrain
-python gbrain.py put-structured memory-2026 "Discutimos o sistema de memória, decidimos usar estrutura de 4 camadas"
-python gbrain.py causal "memória"
+python gbrain.py init
+python gbrain.py put-structured my-event "Discussed system design"
+python gbrain.py causal "system design"
 ```
 
-## Créditos
+## Cron Setup
 
-Inspirado pelo [Claude-Mem](https://github.com/thedotmack/claude-mem).
+```bash
+crontab -e
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
+```
 
-## Licença
+## Acknowledgments
+
+Inspired by [Claude-Mem](https://github.com/thedotmack/claude-mem).
+
+## License
 
 MIT License

@@ -1,40 +1,53 @@
-# CausaMem - कारण स्मृति प्रणाली
+# CausaMem - Causal Memory System
 
-> अपने AI एजेंट को आजीवन स्मृति दें | AI एजेंटों के लिए कारण स्मृति प्रणाली
+> Give your AI Agent a lifetime of memory
 
-[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [हिन्दी](README_hi.md)
+[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [हिन्दी](README_hi.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
-## पृष्ठभूमि
+## Overview
 
-CausaMem AI एजेंटों के लिए एक स्वतंत्र स्मृति प्रणाली है। विकास पूर्ण होने के बाद, हमने [Claude-Mem](https://github.com/thedotmack/claude-mem) का संदर्भ लिया और इसकी मुख्य **AI-संरचित संपीड़न** क्षमता को लागू किया, जिसे **कारण-तर्क** के साथ विस्तारित किया।
+CausaMem - Independent AI Agent memory system with three core modules:
 
-## मुख्य विशेषताएं
+| Module | Description |
+|--------|-------------|
+| Causal Memory (gbrain) | Structured compression + Causal reasoning + 3 search modes |
+| Wiki 4-Layer | Events→Timeline→Relations→Abstractions |
+| Dream (Cron) | Periodic causal chains + Abstract judgments |
 
-| विशेषता | विवरण |
-|---------|--------|
-| 4-परत स्मृति | घटनाएं → समयरेखा → संबंध → सारांश |
-| AI-संरचित संपीड़न | decided/learned/completed/next_steps स्वतः निष्कर्ष |
-| कारण-तर्क | cause (कारण) / effect (प्रभाव) का अनुमान |
-| 3-इंजन खोज | वेक्टर + FTS5 + कारण श्रृंखला |
-| पठनीय Wiki | Obsidian Wiki प्रारूप |
-| प्रकार टैग | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+## Architecture
 
-## त्वरित प्रारंभ
+```
+Startup Memory → SOUL.md / USER.md / MEMORY.md
+Working Memory → memory/*.md + gbrain + wiki/
+Periodic → Small(daily 02:30) + Big Dream(weekly Thu 03:00)
+```
+
+## Quick Start
 
 ```bash
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
+pip install requests
 cd scripts/gbrain
-python gbrain.py put-structured memory-2026 "हमने स्मृति प्रणाली पर चर्चा की, 4-परत संरचना का निर्णय लिया"
-python gbrain.py causal "smriti"
+python gbrain.py init
+python gbrain.py put-structured my-event "Discussed system design"
+python gbrain.py causal "system design"
 ```
 
-## श्रेय
+## Cron Setup
 
-[Claude-Mem](https://github.com/thedotmack/claude-mem) से प्रेरित।
+```bash
+crontab -e
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
+```
 
-## लाइसेंस
+## Acknowledgments
+
+Inspired by [Claude-Mem](https://github.com/thedotmack/claude-mem).
+
+## License
 
 MIT License

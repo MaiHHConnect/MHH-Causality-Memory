@@ -1,40 +1,53 @@
-# CausaMem - Kauzální Paměťový Systém
+# CausaMem - Causal Memory System
 
-> Dejte svému AI Agentovi celoživotní paměť | Kauzální paměťový systém pro AI Agenty
+> Give your AI Agent a lifetime of memory
 
-[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [Čeština](README_cs.md)
+[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [Čeština](README_cs.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
-## Kontext
+## Overview
 
-CausaMem je nezávislý paměťový systém pro AI Agenty. Po dokončení vývoje jsme se inspirovali [Claude-Mem](https://github.com/thedotmack/claude-mem) a implementovali jsme jeho klíčovou funkci **AI-strukturované komprese**, rozšířenou o **kauzální uvažování**.
+CausaMem - Independent AI Agent memory system with three core modules:
 
-## Hlavní Funkce
+| Module | Description |
+|--------|-------------|
+| Causal Memory (gbrain) | Structured compression + Causal reasoning + 3 search modes |
+| Wiki 4-Layer | Events→Timeline→Relations→Abstractions |
+| Dream (Cron) | Periodic causal chains + Abstract judgments |
 
-| Funkce | Popis |
-|--------|--------|
-| 4vrstvá paměť | Události → Časová osa → Vztahy → Souhrny |
-| AI-strukturovaná komprese | Automaticky extrahuje decided/learned/completed/next_steps |
-| Kauzální uvažování | Odvozuje cause (příčina) / effect (důsledek) |
-| 3-motoroé vyhledávání | Vektor + FTS5 + Kauzální řetěz |
-| Čitelná Wiki | Formát Obsidian Wiki |
-| Typové tagy | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+## Architecture
 
-## Rychlý Start
+```
+Startup Memory → SOUL.md / USER.md / MEMORY.md
+Working Memory → memory/*.md + gbrain + wiki/
+Periodic → Small(daily 02:30) + Big Dream(weekly Thu 03:00)
+```
+
+## Quick Start
 
 ```bash
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
+pip install requests
 cd scripts/gbrain
-python gbrain.py put-structured memory-2026 "Diskutovali jsme paměťový systém, rozhodli se pro 4vrstvou strukturu"
-python gbrain.py causal "pamet"
+python gbrain.py init
+python gbrain.py put-structured my-event "Discussed system design"
+python gbrain.py causal "system design"
 ```
 
-## Poděkování
+## Cron Setup
 
-Inspirace od [Claude-Mem](https://github.com/thedotmack/claude-mem).
+```bash
+crontab -e
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
+```
 
-## Licence
+## Acknowledgments
+
+Inspired by [Claude-Mem](https://github.com/thedotmack/claude-mem).
+
+## License
 
 MIT License

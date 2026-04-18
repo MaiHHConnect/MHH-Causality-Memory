@@ -1,4 +1,4 @@
-# 🔗 CausaMem - Causal Memory System for AI Agents
+# CausaMem - Causal Memory System for AI Agents
 
 > Give your AI Agent a lifetime of memory | 让 AI Agent 拥有一生的记忆
 
@@ -10,18 +10,74 @@
 
 ## Background
 
-CausaMem is an independent AI Agent memory system. After completing development, we referenced [Claude-Mem](https://github.com/thedotmack/claude-mem) and implemented its core **AI-powered structured compression** feature, extended with **causal reasoning**.
+CausaMem is an independent AI Agent memory system. It enables agents to:
+- **Remember** — Auto-structured compression of events
+- **Understand** — Auto causal reasoning
+- **Reason** — Cross-timeline relationship discovery
+- **Recall** — Full context at any moment
 
-## Core Features
+## Architecture
 
-| Feature | Description |
-|---------|-------------|
-| Four-Layer Memory | Events → Timeline → Relations → Abstracts |
-| AI Structured Compression | Auto-extract decided/learned/completed/next_steps |
-| Causal Reasoning | Auto-infer cause / effect |
-| Dual-Engine Search | Vector + FTS5 + Causal Chain |
-| Human-Readable Wiki | Obsidian Wiki format |
-| Type Tags | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+```
+┌──────────────────────────────────────────────┐
+│           AI Agent                              │
+├──────────────────────────────────────────────┤
+│  SOUL.md / USER.md / MEMORY.md  (startup)    │
+│  memory/YYYY-MM-DD.md       (daily raw)        │
+│  gbrain.db                 (vector+FTS5)       │
+│  wiki/                     (4-layer wiki)       │
+│  Dream (Cron)              (causal abstraction)│
+└──────────────────────────────────────────────┘
+```
+
+## Three Core Modules
+
+### Module 1: Causal Memory (gbrain)
+
+```bash
+# Write memory with causal inference
+python gbrain.py put-structured my-event "Discussed system design, decided to use X architecture"
+
+# Output: {decided, learned, completed, next_steps, cause, effect, concepts}
+```
+
+**Three search modes:**
+```bash
+python gbrain.py query "system design"   # Vector semantic
+python gbrain.py search "architecture"   # FTS5 full-text
+python gbrain.py causal "design"         # Causal chain
+```
+
+### Module 2: Wiki Four-Layer Structure
+
+| Layer | Path | Description |
+|-------|------|-------------|
+| Events | `events/` | Who + what + result |
+| Timeline | `timeline/` | Chronological串联 |
+| Relations | `relations/` | Causal / correlated links |
+| Abstracts | `_dream/` | Dream output (causal chains + phase analysis) |
+
+### Module 3: Dream Abstraction (Cron)
+
+| Type | Schedule | Content |
+|------|----------|---------|
+| Small | Daily 02:30 | Filter important events |
+| Big | Weekly Thu 03:00 | Causal chains + phase judgments |
+
+**Big Dream Output:**
+```markdown
+## Relationship Discovery
+- [Person A] and [Person B]: relationship description
+
+## Phase Judgments
+- [Project]: current phase: [judgment]
+
+## Causal Chain
+- Event A → Event B → Event C
+
+## Future Implications
+- [Actionable next step]
+```
 
 ## Quick Start
 
@@ -29,17 +85,42 @@ CausaMem is an independent AI Agent memory system. After completing development,
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
 pip install requests
+
+# Optional: API keys for AI compression
 export MINIMAX_API_KEY="your-key"
 export SILICONFLOW_API_KEY="your-key"
+
 cd scripts/gbrain
 python gbrain.py init
-python gbrain.py put-structured memory-2026 "Discussed memory system, decided to use four-layer structure"
-python gbrain.py causal "memory"
+
+# Write memory
+python gbrain.py put-structured my-event "Discussed memory system"
+
+# Search
+python gbrain.py causal "memory system"
+```
+
+## Cron Setup (Optional)
+
+```bash
+crontab -e
+
+# Small Dream: Daily 02:30
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
+
+# Big Dream: Weekly Thu 03:00
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
 
 ## Acknowledgments
 
-This project references [Claude-Mem](https://github.com/thedotmack/claude-mem) for its AI structured compression design.
+This project references [Claude-Mem](https://github.com/thedotmack/claude-mem):
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| AI Structured Compression | Claude-Mem | Compress free text into structured fields |
+| Field Design | Claude-Mem | learned/completed/next_steps fields |
+| Type Tag System | Claude-Mem | Organize observations by type |
 
 ## License
 

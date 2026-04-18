@@ -1,40 +1,53 @@
-# CausaMem - Αιτιώδες Σύστημα Μνήμης
+# CausaMem - Causal Memory System
 
-> Δώστε στον AI Agent σας μνήμη δια βίου | Αιτιώδες Σύστημα Μνήμης για AI Agents
+> Give your AI Agent a lifetime of memory
 
-[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [Ελληνικά](README_el.md)
+[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [Ελληνικά](README_el.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
-## Πλαίσιο
+## Overview
 
-CausaMem είναι ένα ανεξάρτητο σύστημα μνήμης για AI Agents. Μετά την ανάπτυξη, αναφερθήκαμε στο [Claude-Mem](https://github.com/thedotmack/claude-mem) και υλοποιήσαμε την κεντρική του λειτουργία **AI-δομημένης συμπίεσης**, επεκταμένη με **αιτιώδη συλλογιστική**.
+CausaMem - Independent AI Agent memory system with three core modules:
 
-## Κύριες Λειτουργίες
+| Module | Description |
+|--------|-------------|
+| Causal Memory (gbrain) | Structured compression + Causal reasoning + 3 search modes |
+| Wiki 4-Layer | Events→Timeline→Relations→Abstractions |
+| Dream (Cron) | Periodic causal chains + Abstract judgments |
 
-| Λειτουργία | Περιγραφή |
-|-----------|-----------|
-| Μνήμη 4 επιπέδων | Γεγονότα → Χρονοδιάγραμμα → Σχέσεις → Περιλήψεις |
-| AI-δομημένη συμπίεση | Αυτόματη εξαγωγή decided/learned/completed/next_steps |
-| Αιτιώδης συλλογιστική | Συνάγει cause (αιτία) / effect (αποτέλεσμα) |
-| Αναζήτηση 3 κινητήρων | Διάνυσμα + FTS5 + Αιτιώδης αλυσίδα |
-| Ευανάγνωστο Wiki | Μορφή Obsidian Wiki |
-| Ετικέτες τύπου | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+## Architecture
 
-## Γρήγορη Εκκίνηση
+```
+Startup Memory → SOUL.md / USER.md / MEMORY.md
+Working Memory → memory/*.md + gbrain + wiki/
+Periodic → Small(daily 02:30) + Big Dream(weekly Thu 03:00)
+```
+
+## Quick Start
 
 ```bash
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
+pip install requests
 cd scripts/gbrain
-python gbrain.py put-structured memory-2026 "Συζητήσαμε το σύστημα μνήμης, αποφασίσαμε να χρησιμοποιήσουμε δομή 4 επιπέδων"
-python gbrain.py causal "mnhmh"
+python gbrain.py init
+python gbrain.py put-structured my-event "Discussed system design"
+python gbrain.py causal "system design"
 ```
 
-## Ευχαριστίες
+## Cron Setup
 
-Εμπνευσμένο από το [Claude-Mem](https://github.com/thedotmack/claude-mem).
+```bash
+crontab -e
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
+```
 
-## Άδεια
+## Acknowledgments
+
+Inspired by [Claude-Mem](https://github.com/thedotmack/claude-mem).
+
+## License
 
 MIT License

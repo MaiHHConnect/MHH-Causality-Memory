@@ -2,99 +2,61 @@
 
 > AI Agentに生涯の記憶を | Causal Memory System for AI Agents
 
-[English](README_en.md) | [中文](README.md) | 日本語 | [한국어](README_ko.md)
+[English](README_en.md) | [中文](README.md) | 日本語 | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [Polski](README_pl.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
-## プロジェクト背景
+## プロジェクト概要
 
-CausaMemは independently 開発されたAI Agent記憶システムです。開発完了後、[Claude-Mem](https://github.com/thedotmack/claude-mem)を参考に、その中核となる**AI構造化圧縮**機能を実装し、さらに**因果推論**能力を拡張しました。
+CausaMemは独立したAI Agent記憶システム。3つのコアモジュールで構成：
 
-## コア機能
+| モジュール | 説明 |
+|-----------|------|
+| 因果記憶(gbrain) | 構造化圧縮 + 因果推論 + 3種検索 |
+| Wiki 4層構造 | イベント→タイムライン→関係→抽象 |
+| 做梦(クロン) | 定期因果串線 + 抽象判断 |
 
-| 機能 | 説明 |
-|------|------|
-| 4層記憶構造 | イベント → タイムライン → 関係チェーン → 抽象サマリー |
-| AI構造化圧縮 | decided/learned/completed/next_steps を自動抽出 |
-| 因果推論 | cause（前因）/ effect（結果） を自動推定 |
-| デュアルエンジン検索 | ベクター + FTS5全文 + 因果チェーン |
-| 人間が読めるWiki | Obsidian Wiki形式、直接閲覧・編集可能 |
-| タイプタグ | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
+## 3層アーキテクチャ
+
+```
+起動記憶 → SOUL.md / USER.md / MEMORY.md
+作業記憶 → memory/*.md + gbrain + wiki/
+定期実行 → 小整理(毎日2:30) + 大做梦(毎週木3:00)
+```
 
 ## クイックスタート
-
-### 1. クローン
 
 ```bash
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
-```
-
-### 2. 依存関係インストール
-
-```bash
 pip install requests
-```
-
-### 3. API Key設定
-
-```bash
-export MINIMAX_API_KEY="your-minimax-key"
-export SILICONFLOW_API_KEY="your-siliconflow-key"
-```
-
-### 4. 初期化
-
-```bash
 cd scripts/gbrain
 python gbrain.py init
+
+# 記憶の書き込み
+python gbrain.py put-structured my-event "システム設計について議論、Xアーキテクチャ採用を決定"
+
+# 検索
+python gbrain.py causal "システム設計"  # 因果検索
+python gbrain.py query "設計"          # ベクター
+python gbrain.py search "アーキテクチャ" # FTS5
 ```
 
-### 5. 使用方法
+## Cron設定（做梦）
 
 ```bash
-# 構造化圧縮付きで記憶を書き込み
-python gbrain.py put-structured memory-2026-04 "記憶システムについて議論し、4層構造を採用することにした"
+crontab -e
 
-# AI圧縮（構造化出力を確認）
-python gbrain.py compress "あなたの観測内容"
+# 小整理：毎日 02:30
+30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
 
-# ベクター意味検索
-python gbrain.py query "記憶システム"
-
-# FTS5全文検索
-python gbrain.py search "4層"
-
-# 因果チェーン検索
-python gbrain.py causal "記憶システム"
+# 大做梦：毎週木曜 03:00
+0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
 
 ## 謝辞
 
-本プロジェクトは開発中に[Claude-Mem](https://github.com/thedotmack/claude-mem)を参照しました：
-
-| 機能 | ソース | 説明 |
-|------|--------|------|
-| AI構造化圧縮 | Claude-Mem | フリーテキストを構造化フィールドに圧縮 |
-| フィールド設計 | Claude-Mem | learned/completed/next_steps フィールド |
-| タイプタグシステム | Claude-Mem | タイプ別観測記録整理 |
-
-## プロジェクト構造
-
-```
-MHH-Causality-Memory/
-├── README.md
-├── README_en.md
-├── README_ja.md
-├── README_ko.md
-├── docs/
-├── scripts/
-│   ├── setup.sh
-│   └── gbrain/
-│       ├── gbrain.py
-│       └── ...
-└── wiki/
-```
+[Claude-Mem](https://github.com/thedotmack/claude-mem)のAI構造化圧縮を参考。
 
 ## ライセンス
 
@@ -104,7 +66,3 @@ MIT License
 
 - [Vinson](https://github.com/MaiHHConnect)
 - [牛馬2号](https://github.com/openclaw) (AI Agent)
-
----
-
-*記憶を持つAI Agentのために建造されました。*
