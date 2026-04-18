@@ -51,6 +51,8 @@ def _init_schema(conn: sqlite3.Connection):
             -- Causality fields (因果推理)
             cause           TEXT,     -- 前因：导致这个事件的原因
             effect          TEXT,     -- 后果：导致的后续事件/变化
+            -- Emotion field (情绪追踪)
+            emotion         TEXT,     -- 情绪状态：开心|低落|饿|饱|累|精神|焦虑|专注|满足|空虚|无
             created_at      TEXT DEFAULT (datetime('now')),
             updated_at      TEXT DEFAULT (datetime('now'))
         );
@@ -97,6 +99,11 @@ def _init_schema(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_tags_page ON tags(page_id);
         CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
     """)
+    # Migration: add emotion column if it doesn't exist
+    try:
+        conn.execute("ALTER TABLE pages ADD COLUMN emotion TEXT DEFAULT '无'")
+    except Exception:
+        pass  # Column already exists
 
 # ── Embeddings ──────────────────────────────────────────────────────────────
 
@@ -334,6 +341,8 @@ def cmd_causal(keyword: str, limit: int = 10):
             print(f"  前因: {r['cause']}")
         if r.get('effect'):
             print(f"  后果: {r['effect']}")
+        if r.get('emotion'):
+            print(f"  情绪: {r['emotion']}")
         if r.get('decided'):
             print(f"  决定: {r['decided']}")
 
@@ -370,9 +379,10 @@ def compress_observation(raw_text: str, obs_type: str = "INSIGHT") -> dict:
 - concepts: 概念标签（2-4个中文关键词）
 - cause: 前因——导致这个事件发生的原因是什么（15字内，没有则写"无"）
 - effect: 后果——这个事件会导致什么后续变化（15字内，没有则写"无"）
+- emotion: 当前情绪状态，从以下10种选一个：开心|低落|饿|饱|累|精神|焦虑|专注|满足|空虚|无
 
 JSON格式：
-{{"decided":"...", "learned":"...", "completed":"...", "next_steps":"...", "concepts":["...","..."], "cause":"...", "effect":"..."}}"""
+{{"decided":"...", "learned":"...", "completed":"...", "next_steps":"...", "concepts":["...","..."], "cause":"...", "effect":"...", "emotion":"..."}}"""
 
     try:
         resp = requests.post(
@@ -400,6 +410,7 @@ JSON格式：
                 "concepts": data.get("concepts", []),
                 "cause": data.get("cause", ""),
                 "effect": data.get("effect", ""),
+                "emotion": data.get("emotion", "无"),
                 "summary_struct": {"type": obs_type, "raw": raw_text[:500]}
             }
     except Exception as e:
@@ -413,6 +424,7 @@ JSON格式：
         "concepts": [],
         "cause": "",
         "effect": "",
+        "emotion": "无",
         "summary_struct": {"type": obs_type, "raw": raw_text[:200]}
     }
 
@@ -438,8 +450,8 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
     cursor.execute("""
         INSERT INTO pages (slug, type, title, compiled_truth, timeline, 
                          summary_struct, concepts, decided, learned, completed, next_steps,
-                         cause, effect, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         cause, effect, emotion, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(slug) DO UPDATE SET
             type=excluded.type, title=excluded.title,
             compiled_truth=excluded.compiled_truth, timeline=excluded.timeline,
@@ -447,12 +459,14 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
             decided=excluded.decided, learned=excluded.learned,
             completed=excluded.completed, next_steps=excluded.next_steps,
             cause=excluded.cause, effect=excluded.effect,
+            emotion=excluded.emotion,
             updated_at=excluded.updated_at
     """, (slug, page_type, title, compiled, timeline, 
           summary_json, concepts_json,
           structured["decided"], structured["learned"],
           structured["completed"], structured["next_steps"],
-          structured.get("cause", ""), structured.get("effect", ""), now))
+          structured.get("cause", ""), structured.get("effect", ""),
+          structured.get("emotion", "无"), now))
 
     page_id = cursor.execute("SELECT id FROM pages WHERE slug=?", (slug,)).fetchone()[0]
 
@@ -583,6 +597,8 @@ if __name__ == "__main__":
         print(f"  next_steps: {structured['next_steps']}")
         print(f"  concepts: {structured['concepts']}")
         print(f"  cause: {structured.get('cause', '')}")
+        print(f"  effect: {structured.get('effect', '')}")
+        print(f"  emotion: {structured.get('emotion', '无')}")
         print(f"  effect: {structured.get('effect', '')}")
     elif cmd == "causal":
         cmd_causal(sys.argv[2] if len(sys.argv) > 2 else "", 20)
