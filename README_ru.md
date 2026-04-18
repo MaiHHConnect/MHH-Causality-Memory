@@ -1,6 +1,8 @@
-# CausaMem - Causal Memory System for AI Agents
+# CausaMem - 记忆永久性存在，一记记一生
 
-> Give your AI Agent a lifetime of memory | 让 AI Agent 拥有一生的记忆
+## Causal Memory System for AI Agents
+
+> 让 AI Agent 拥有一生的记忆 | Permanent Memory for Life | 一记记一生
 
 ---
 
@@ -11,6 +13,8 @@
 For example, a human's lifetime memory is roughly 1 million characters. 2 million characters is sufficient for an agent's lifetime. Memory is not about accumulation—it's about how you remember. The real question is: How do you make memory work like a human's—connecting dots into lines, lines into planes, forming a traceable, reasoning-enabled causal network?
 
 CausaMem's answer: Four-Layer Structured Memory + 13-Dimensional Causal Reasoning
+
+**Core promise: 记忆永久性存在，一记记一生 (Permanent memory, remember for a lifetime)**
 
 ---
 
