@@ -2,7 +2,9 @@
 
 > 让 AI Agent 拥有一生的记忆 | Causal Memory System for AI Agents
 
-[English](README_en.md) | 中文 | [日本語](README_ja.md) | [한국어](README_ko.md)
+---
+
+🌐 **语言 / Language:** [English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | [Português](README_pt-BR.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [Polski](README_pl.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
 
 ---
 
@@ -56,11 +58,7 @@ cd MHH-Causality-Memory
 ### 2. 安装依赖
 
 ```bash
-# Python 依赖
 pip install requests
-
-# 向量模型 (可选，向量搜索用)
-# 需要 SiliconFlow API Key
 ```
 
 ### 3. 配置 API Key
@@ -81,9 +79,9 @@ python gbrain.py init
 
 ```bash
 # 写入带结构化压缩的记忆
-python gbrain.py put-structured memory-2026-04 "我们讨论了记忆系统，决定采用四层结构"
+python gbrain.py put-structured memory-2026 "讨论记忆系统，决定采用四层结构"
 
-# AI 压缩观测（查看结构化输出）
+# AI 压缩观测
 python gbrain.py compress "你的观测内容"
 
 # 向量语义搜索
@@ -98,45 +96,21 @@ python gbrain.py causal "记忆系统"
 
 ## 借鉴说明
 
-本项目在开发过程中参考了 [Claude-Mem](https://github.com/thedotmack/claude-mem)：
+本项目参考了 [Claude-Mem](https://github.com/thedotmack/claude-mem)：
 
 | 借鉴内容 | 来源 | 说明 |
 |----------|------|------|
-| AI 结构化压缩 | Claude-Mem Session Summary | 将自由文本压缩为结构化字段 |
-| 字段设计 | Claude-Mem | learned / completed / next_steps 等字段 |
+| AI 结构化压缩 | Claude-Mem | 将自由文本压缩为结构化字段 |
+| 字段设计 | Claude-Mem | learned / completed / next_steps 字段 |
 | 类型标签系统 | Claude-Mem | 按类型组织观测记录 |
 
-> Claude-Mem 是 TheDotMack 开发的高级 Claude Code 记忆插件，采用 SQLite + Chroma 向量库架构。本项目在其基础上独立实现了因果推理和 Wiki 格式存储。
-
-## 目录结构
-
-```
-MHH-Causality-Memory/
-├── README.md
-├── README_en.md           # English
-├── README_ja.md           # 日本語
-├── README_ko.md           # 한국어
-├── docs/                  # 文档
-│   ├── 01_记忆系统架构说明.md
-│   └── 安装指南.md
-├── scripts/
-│   ├── setup.sh           # 一键安装脚本
-│   └── gbrain/
-│       ├── gbrain.py      # 核心脚本（含 AI 压缩）
-│       ├── search.py       # 搜索脚本
-│       ├── ingest.py       # 批量导入
-│       ├── stats.py        # 统计
-│       ├── init.py         # 初始化
-│       └── brain.db.placeholder
-└── wiki/                  # Wiki 模板
-    └── templates/
-```
+> Claude-Mem 是 TheDotMack 开发的高级 Claude Code 记忆插件。本项目在其基础上独立实现了因果推理和 Wiki 格式存储。
 
 ## 技术栈
 
 - **存储**: SQLite
 - **向量搜索**: SiliconFlow Qwen3-Embedding-8B
-- **AI 压缩**: MiniMax API / OpenAI Compatible
+- **AI 压缩**: MiniMax API
 - **格式**: Obsidian Wiki (Markdown)
 
 ## License
