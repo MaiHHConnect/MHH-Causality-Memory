@@ -14,28 +14,60 @@
 
 A human's lifetime memory is roughly 1 million characters. An AI agent's context window is larger (2 million characters). But stacking information isn't effective memory. The real question is: **How do you make memory work like a human's—connecting dots into lines, lines into planes, forming a traceable, reasoning-enabled causal network?**
 
-CausaMem's answer: **Four-Layer Structured Memory + Causal Reasoning**
+CausaMem's answer: **Four-Layer Structured Memory + 13-Dimensional Causal Reasoning**
 
 ```
 Event (dot) → Timeline (line) → Relation (plane) → Abstract (attribution)
 ```
 
-Each layer is an abstraction of the layer below—not data accumulation, but building a **dot-to-plane attribution memory system**.
+---
 
-Add **cause** and **effect** automatic inference, so every event is no longer isolated, but a node in the causal network.
+## 13-Dimensional Causal Reasoning System
+
+This is CausaMem's core innovation and fundamental difference from other memory systems.
+
+| Dimension | Core Question | Description |
+|-----------|-------------|-------------|
+| 1. Cause Tracing | "Why?" | Trace back from result to root cause |
+| 2. Effect Prediction | "What then?" | Project forward from cause to likely outcomes |
+| 3. Causal Chains | "What's the full chain?" | Connect multiple events into complete chains |
+| 4. Bidirectional | "Where from? Where to?" | Forward + backward reasoning for full understanding |
+| 5. Relation Classification | "Causal or correlated?" | Distinguish causation from correlation |
+| 6. Strong/Weak Cause | "Necessary or probabilistic?" | Distinguish strong causation from triggering conditions |
+| 7. Intervention Thinking | "What if...?" | Counterfactual reasoning for decision support |
+| 8. Temporal Decay | "Still valid now?" | Cause validity over time, auto-expire outdated causes |
+| 9. Multi-Cause Attribution | "Who was the main cause?" | Identify primary cause when multiple causes coexist |
+| 10. Chain Breakage | "Which link broke?" | Detect missing or abnormal links in causal chains |
+| 11. Anomaly Discovery | "This was unexpected?" | Identify events that don't fit expected causal chains |
+| 12. Intent Inference | "What did they want?" | Reverse-engineer intent from behavior |
+| 13. Context Reconstruction | "What was the situation?" | Restore complete context at time of event |
+
+**Application Scenarios:**
+- **Cause Tracing** → Root cause analysis
+- **Effect Prediction** → Risk assessment
+- **Intervention Thinking** → Decision support
+- **Intent Inference** → Understanding user needs
+- **Context Reconstruction** → Historical decision review
 
 ---
 
 ## Core Features
 
-### 1. Causal Reasoning (Core Innovation)
-Automatically infer **cause** and **effect** from events, turning isolated facts into traceable causal chains.
+### 1. Causal Reasoning (13-Dimensional)
+Automatically infer **cause** and **effect** from events, analyzed across 13 dimensions.
 
 ```
 Input: "Discussed memory system, decided to use four-layer structure"
 Output:
   cause: "Previous architecture was too simple"
   effect: "Laid foundation for subsequent development"
+  dimension: {
+    cause_tracing: "Architecture needed traceability",
+    effect_prediction: "Development efficiency improved",
+    causal_chain: "Discussion→Decision→Implementation→Validation",
+    bidirectional: "Traceable forward and backward",
+    ...
+  }
 ```
 
 ### 2. AI Structured Compression
@@ -77,7 +109,7 @@ Periodic tasks for causal chains and abstract judgments:
 | Type | Schedule | Content |
 |------|----------|---------|
 | Small | Daily 02:30 | Filter important events |
-| Big | Weekly Thu 03:00 | Causal chains + phase analysis |
+| Big | Weekly Thu 03:00 | 13-dimensional causal analysis + phase judgment |
 
 ### 6. Type Tag System
 Organize memories by type: `DECISION` | `INSIGHT` | `BUG` | `FEATURE` | `CHANGE` | `DAILY`
@@ -111,7 +143,7 @@ export SILICONFLOW_API_KEY="your-key"
 cd scripts/gbrain
 python gbrain.py init
 
-# Write memory (auto compression + causal inference)
+# Write memory (auto compression + 13D causal inference)
 python gbrain.py put-structured my-event "Discussed system design"
 
 # Three search modes
@@ -146,7 +178,7 @@ MHH-Causality-Memory/
 │   ├── setup.sh
 │   ├── dream.py
 │   └── gbrain/
-│       ├── gbrain.py
+│       ├── gbrain.py    (13D causal reasoning)
 │       └── ...
 └── wiki/
     ├── _dream/
