@@ -170,19 +170,6 @@ python gbrain.py causal "系统设计"    # 因果链
 python gbrain.py query "系统设计"     # 向量
 python gbrain.py search "方案"       # 全文
 ```
-
-## 借鉴说明
-
-本项目参考了 [Claude-Mem](https://github.com/thedotmack/claude-mem)：
-
-| 借鉴内容 | 来源 | 说明 |
-|----------|------|------|
-| AI 结构化压缩 | Claude-Mem | 将自由文本压缩为结构化字段 |
-| 字段设计 | Claude-Mem | learned / completed / next_steps 字段 |
-| 类型标签系统 | Claude-Mem | 按类型组织观测记录 |
-
-> Claude-Mem 是 TheDotMack 开发的高级 Claude Code 记忆插件。本项目在其基础上独立实现了因果推理和 Wiki 格式存储。
-
 ## 目录结构
 
 ```

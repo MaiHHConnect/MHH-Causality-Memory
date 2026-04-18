@@ -56,7 +56,6 @@ crontab -e
 
 ## 감사의 말
 
-[Claude-Mem](https://github.com/thedotmack/claude-mem)의 AI 구조화 압축을 참고했습니다.
 
 ## 라이선스
 

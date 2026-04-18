@@ -53,11 +53,6 @@ crontab -e
 # 大做夢：每週四 03:00
 0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
-
-## 借鑒說明
-
-參考了 [Claude-Mem](https://github.com/thedotmack/claude-mem) 的 AI 結構化壓縮。
-
 ## 授權
 
 MIT License

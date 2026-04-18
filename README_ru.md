@@ -53,11 +53,6 @@ crontab -e
 # Большой сон: Еженедельно чт 03:00
 0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
-
-## Благодарности
-
-Вдохновлено [Claude-Mem](https://github.com/thedotmack/claude-mem).
-
 ## Лицензия
 
 MIT License

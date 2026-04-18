@@ -111,17 +111,6 @@ crontab -e
 # Big Dream: Weekly Thu 03:00
 0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
-
-## Acknowledgments
-
-This project references [Claude-Mem](https://github.com/thedotmack/claude-mem):
-
-| Feature | Source | Description |
-|---------|--------|-------------|
-| AI Structured Compression | Claude-Mem | Compress free text into structured fields |
-| Field Design | Claude-Mem | learned/completed/next_steps fields |
-| Type Tag System | Claude-Mem | Organize observations by type |
-
 ## License
 
 MIT License

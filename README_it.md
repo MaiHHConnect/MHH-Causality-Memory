@@ -46,7 +46,6 @@ crontab -e
 
 ## Crediti
 
-Ispirato da [Claude-Mem](https://github.com/thedotmack/claude-mem).
 
 ## Licenza
 

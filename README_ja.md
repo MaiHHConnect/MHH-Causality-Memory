@@ -56,7 +56,6 @@ crontab -e
 
 ## 謝辞
 
-[Claude-Mem](https://github.com/thedotmack/claude-mem)のAI構造化圧縮を参考。
 
 ## ライセンス
 

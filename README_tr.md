@@ -43,11 +43,6 @@ crontab -e
 30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
 0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
-
-## Acknowledgments
-
-Inspired by [Claude-Mem](https://github.com/thedotmack/claude-mem).
-
 ## License
 
 MIT License

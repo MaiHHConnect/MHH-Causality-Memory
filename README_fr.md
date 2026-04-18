@@ -53,11 +53,6 @@ crontab -e
 # Grand rêve: Hebdomadaire jeu 03:00
 0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
-
-## Crédits
-
-Inspiré par [Claude-Mem](https://github.com/thedotmack/claude-mem).
-
 ## Licence
 
 MIT License
