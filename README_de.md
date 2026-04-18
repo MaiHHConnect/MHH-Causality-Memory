@@ -1,4 +1,4 @@
-# CausaMem - 记忆永久性存在，一记记一生
+# CausaMem - 永久性记忆，因果记忆系统
 
 ## Causal Memory System for AI Agents
 

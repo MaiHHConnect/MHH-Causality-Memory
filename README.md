@@ -1,4 +1,4 @@
-# 🔗 CausaMem - 因果记忆系统
+# 🔗 CausaMem - 永久性记忆，因果记忆系统
 
 > 让 AI Agent 拥有一生的记忆 | Causal Memory System for AI Agents
 
