@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>因果记忆 CausaMem — Causal Memory for AI Agents</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+  .header { text-align: center; margin-bottom: 40px; }
+  .badge { display: inline-block; background: #238636; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 13px; margin-bottom: 12px; }
+  h1 { font-size: 42px; color: #f0f6fc; margin-bottom: 12px; }
+  .subtitle { font-size: 20px; color: #8b949e; margin-bottom: 24px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 32px; justify-content: center; }
+  .tab-btn {
+    padding: 10px 28px; border: 1px solid #30363d; background: #161b22; color: #8b949e;
+    border-radius: 8px; cursor: pointer; font-size: 15px; transition: all 0.2s;
+  }
+  .tab-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+  .tab-btn.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .github-link { display: inline-block; background: #238636; color: #fff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-size: 16px; margin: 8px; transition: background 0.2s; }
+  .github-link:hover { background: #2ea043; }
+  .license { text-align: center; margin-top: 24px; color: #484f58; font-size: 13px; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px; margin-bottom: 20px; }
+  h2 { font-size: 22px; color: #f0f6fc; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  h2::before { content: ''; width: 4px; height: 22px; background: #1f6feb; border-radius: 2px; flex-shrink: 0; }
+  h3 { font-size: 17px; color: #c9d1d9; margin: 20px 0 10px; }
+  p { line-height: 1.8; color: #8b949e; margin-bottom: 12px; font-size: 15px; }
+  pre { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 13px; color: #c9d1d9; margin: 12px 0; line-height: 1.6; white-space: pre; }
+  code { color: #79c0ff; background: #0d1117; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .feature-item { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 14px; }
+  .feature-item strong { color: #f0f6fc; display: block; margin-bottom: 4px; font-size: 14px; }
+  .feature-item span { color: #8b949e; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: #1f6feb; color: #fff; padding: 10px 12px; text-align: left; border-radius: 6px 6px 0 0; }
+  td { background: #0d1117; color: #c9d1d9; padding: 9px 12px; border-top: 1px solid #21262d; }
+  tr:hover td { background: #161b22; }
+  .bottom-links { text-align: center; margin-top: 32px; }
+  .authors { text-align: center; margin-top: 24px; color: #484f58; font-size: 13px; }
+  .authors span { color: #8b949e; }
+  @media (max-width: 600px) {
+    .feature-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <div class="badge">MIT License</div>
+  <h1>因果记忆 CausaMem</h1>
+  <p class="subtitle">因果关联的记忆系统 — 为跨越一生的 AI Agent 而设计</p>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="zh">🇨🇳 中文</button>
+    <button class="tab-btn" data-tab="en">🇺🇸 English</button>
+  </div>
+</div>
+
+<!-- Chinese -->
+<div id="tab-zh" class="tab-content active">
+  <div class="section">
+    <h2>它是什么</h2>
+    <p>人一生的记忆大约 100 万字符。给 AI Agent 200 万字符，它需要全部想起来吗？</p>
+    <p><strong>不需要。</strong></p>
+    <p>真正的记忆，不是仓库的堆叠，而是<strong>因果之网</strong>。每一个"果"都指向它的"因"，每一个"因"都通向它的"果"。当你触摸这张网的任意一个节点，整条因果链条就会自然浮现。</p>
+    <p>MHH-Causality Memory 就是这张网。</p>
+  </div>
+
+  <div class="section">
+    <h2>它做什么</h2>
+    <pre>Session 1: Agent learns "浩哥 在 2026-04-18 重构了记忆系统"
+Session 2: Agent asks "浩哥 最近在做什么？" → recalls the 04-18 refactor
+         → traces back to the 04-13 Wiki restructure
+         → connects to the first OpenClaw session on 04-08
+         → understands the full evolution pattern
+           without storing everything explicitly</pre>
+    <p>普通的记忆系统是键值存储。MHH-Causality Memory 是因果之网。</p>
+  </div>
+
+  <div class="section">
+    <h2>核心概念：因果关联</h2>
+    <h3>果的因，因的果。</h3>
+    <pre>  Event A（因）
+       ↓ creates
+  Event B（果）
+       ↓ explains
+  Event C（果的果）→ ...形成联想链条</pre>
+    <p>记忆不是"记了什么"，而是<strong>"什么导致了什么"</strong>。</p>
+    <p>当两个 agent（OpenClaw + Hermes）对话时，Agent A 的记忆碎片可以触发 Agent B 的因果链，因果链条像涟漪一样扩散，记忆自动"想到"而不是被"搜到"。</p>
+  </div>
+
+  <div class="section">
+    <h2>架构</h2>
+    <pre>┌─────────────────────────────────────────────────────────┐
+│  SURFACE LAYER（热层）                                    │
+│  当前上下文直接可读，Agent 直接使用                        │
+├─────────────────────────────────────────────────────────┤
+│  CAUSAL LAYER（因果层）                                   │
+│  果→因，因→果。每条边有权重：因果强度 × 时间距离          │
+├─────────────────────────────────────────────────────────┤
+│  SEMANTIC LAYER（语义层）                                 │
+│  FTS5 精确匹配 + 向量语义搜索，兜底检索                   │
+├─────────────────────────────────────────────────────────┤
+│  STRUCTURAL LAYER（结构层 — Wiki 四层）                  │
+│  事件层 / 时间线层 / 关系链层 / 抽象总结层               │
+└─────────────────────────────────────────────────────────┘</pre>
+  </div>
+
+  <div class="section">
+    <h2>核心特性</h2>
+    <div class="feature-grid">
+      <div class="feature-item"><strong>🔗 因果关联</strong><span>记忆之间以因果链条存储，不是孤立事实</span></div>
+      <div class="feature-item"><strong>🔄 因果反向关联</strong><span>结果可反向追溯原因，触发整条链条回忆</span></div>
+      <div class="feature-item"><strong>⏱️ 因果强度衰减</strong><span>随时间自然衰减，强因果保留更久</span></div>
+      <div class="feature-item"><strong>🎯 双引擎兜底</strong><span>FTS5 精确 + 向量语义，命中&lt;2条自动兜底</span></div>
+      <div class="feature-item"><strong>📚 Wiki 四层结构</strong><span>事件/时间线/关系链/抽象，可用 Obsidian 浏览</span></div>
+      <div class="feature-item"><strong>🤝 跨 Agent 共享</strong><span>OpenClaw 和 Hermes 共用 Wiki，因果跨 agent</span></div>
+      <div class="feature-item"><strong>🧠 一生记忆容量</strong><span>200万字符上下文，按因果权重自动调度</span></div>
+      <div class="feature-item"><strong>⚡ 零外部依赖</strong><span>本地存储，可离线运行</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>记忆容量：100万 vs 200万字符</h2>
+    <table>
+      <tr><th>触发方式</th><th>加载范围</th></tr>
+      <tr><td>精确问答</td><td>相关因果链（1-5 个节点）</td></tr>
+      <tr><td>主题联想</td><td>整条因果链（10-20 个节点）</td></tr>
+      <tr><td>深度回顾</td><td>全量扫描 + 权重排序（50-100 个节点）</td></tr>
+    </table>
+    <p>不需要全量加载，只需要<strong>触发的节点 + 因果链条</strong>。</p>
+  </div>
+
+  <div class="section">
+    <h2>对比其他记忆系统</h2>
+    <table>
+      <tr><th></th><th>传统键值</th><th>OpenClaw 默认</th><th>S+Memory</th><th>MHH-Causality</th></tr>
+      <tr><td>存储形式</td><td>KV 对</td><td>文本文件</td><td>向量事实</td><td>因果链条</td></tr>
+      <tr><td>关联方式</td><td>无</td><td>无</td><td>共现关系</td><td>因果强度</td></tr>
+      <tr><td>召回方式</td><td>精确匹配</td><td>读文件</td><td>语义搜索</td><td>因果扩散</td></tr>
+      <tr><td>跨 Agent</td><td>❌</td><td>困难</td><td>✅</td><td>✅ Wiki 共享</td></tr>
+      <tr><td>可解释性</td><td>低</td><td>中</td><td>中</td><td>高（因果链清晰）</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>适用场景</h2>
+    <p>• <strong>个人 AI Agent</strong> — 一生的记忆，跨 agent 共享</p>
+    <p>• <strong>团队记忆系统</strong> — 多 agent 协作，因果脉络不丢失</p>
+    <p>• <strong>长期项目</strong> — 记录"为什么这么做"，而不只是"做了什么"</p>
+    <p>• <strong>知识沉淀</strong> — Wiki 四层 + 因果关联，可用 Obsidian 直接维护</p>
+  </div>
+
+  <div class="section">
+    <h2>快速开始</h2>
+    <pre>git clone https://github.com/YOUR_USERNAME/MHH-Causality-Memory.git
+cd MHH-Causality-Memory
+mkdir -p wiki/main/{events,timeline,relationships,abstracts}
+# 配置 OpenClaw memory_search 后即可使用</pre>
+  </div>
+
+  <div class="bottom-links">
+    <a href="https://github.com/YOUR_USERNAME/MHH-Causality-Memory" class="github-link">📂 GitHub 仓库</a>
+  </div>
+
+  <div class="license">
+    <p><strong>MIT License</strong> — 个人/开源免费 · 商业使用需联系授权</p>
+    <p class="authors">Authors: <span>Vinson</span> & <span>牛马2号 (Niuma2)</span></p>
+  </div>
+</div>
+
+<!-- English -->
+<div id="tab-en" class="tab-content">
+  <div class="section">
+    <h2>What It Is</h2>
+    <p>A human's lifetime memory is roughly 1 million characters. Give an AI agent 2 million characters of context — does it need to recall all of it?</p>
+    <p><strong>No.</strong></p>
+    <p>Real memory is not a warehouse. It is a <strong>causal web</strong>. Every "effect" points to its "cause". Every "cause" leads to its "effect". When you touch any node of this web, the entire causal chain naturally emerges.</p>
+    <p>MHH-Causality Memory is this web.</p>
+  </div>
+
+  <div class="section">
+    <h2>What It Does</h2>
+    <pre>Session 1: Agent learns "浩哥 refactored the memory system on 2026-04-18"
+Session 2: Agent asks "What has 浩哥 been working on recently?"
+         → recalls the 04-18 refactor
+         → traces back to the 04-13 Wiki restructure
+         → connects to the first OpenClaw session on 04-08
+         → understands the full evolution pattern
+           without storing everything explicitly</pre>
+    <p>Traditional agent memory is flat key-value storage. MHH-Causality Memory is a causal web.</p>
+  </div>
+
+  <div class="section">
+    <h2>Core Concept: Causality Links</h2>
+    <h3>The cause of the effect. The effect of the cause.</h3>
+    <pre>  Event A (cause)
+       ↓ creates
+  Event B (effect)
+       ↓ explains
+  Event C (effect of effect) → ...forming associative chains</pre>
+    <p>Memory is not "what was stored" — it is <strong>"what caused what"</strong>.</p>
+    <p>When two agents (OpenClaw + Hermes) converse, Agent A's memory fragments can trigger Agent B's causal chain. The causal chain ripples outward — memory is "recalled" rather than "searched".</p>
+  </div>
+
+  <div class="section">
+    <h2>Architecture</h2>
+    <pre>┌─────────────────────────────────────────────────────────┐
+│  SURFACE LAYER                                            │
+│  Directly readable in current context                     │
+├─────────────────────────────────────────────────────────┤
+│  CAUSAL LAYER                                            │
+│  effect→cause, cause→effect. Edge weight =               │
+│  causal_strength × temporal_decay                         │
+├─────────────────────────────────────────────────────────┤
+│  SEMANTIC LAYER                                          │
+│  FTS5 exact match + vector semantic search                │
+├─────────────────────────────────────────────────────────┤
+│  STRUCTURAL LAYER — Wiki 4-Layer                         │
+│  Events / Timeline / Relationships / Abstracts            │
+└─────────────────────────────────────────────────────────┘</pre>
+  </div>
+
+  <div class="section">
+    <h2>Key Features</h2>
+    <div class="feature-grid">
+      <div class="feature-item"><strong>🔗 Causality Links</strong><span>Memory stored as causal chains, not isolated facts</span></div>
+      <div class="feature-item"><strong>🔄 Reverse Causation</strong><span>Effects trace back to causes, triggering the whole chain</span></div>
+      <div class="feature-item"><strong>⏱️ Causal Decay</strong><span>Causal strength decays over time; strong causes last longer</span></div>
+      <div class="feature-item"><strong>🎯 Dual-Engine Fallback</strong><span>FTS5 exact + vector semantic; auto-fallback on &lt;2 hits</span></div>
+      <div class="feature-item"><strong>📚 Wiki 4-Layer</strong><span>Events / Timeline / Relationships / Abstracts — Obsidian-ready</span></div>
+      <div class="feature-item"><strong>🤝 Cross-Agent Shared</strong><span>OpenClaw + Hermes share Wiki; causal chains cross agents</span></div>
+      <div class="feature-item"><strong>🧠 Lifetime Capacity</strong><span>2M char context; auto-scheduled by causal weight + decay</span></div>
+      <div class="feature-item"><strong>⚡ Zero Dependencies</strong><span>Local storage; works fully offline</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Memory Capacity: 1M vs 2M Characters</h2>
+    <p>A human lifetime ≈ 1M characters. Giving an agent 2M doesn't mean loading all of it.</p>
+    <table>
+      <tr><th>Trigger Type</th><th>Loaded Scope</th></tr>
+      <tr><td>Precise Q&amp;A</td><td>Related causal chain (1–5 nodes)</td></tr>
+      <tr><td>Thematic Association</td><td>Full causal chain (10–20 nodes)</td></tr>
+      <tr><td>Deep Reflection</td><td>Full scan + weight sort (50–100 nodes)</td></tr>
+    </table>
+    <p>You don't load everything. You load <strong>the triggered node + its causal chain</strong>.</p>
+  </div>
+
+  <div class="section">
+    <h2>Comparison with Other Memory Systems</h2>
+    <table>
+      <tr><th></th><th>KV Store</th><th>OpenClaw Default</th><th>S+Memory</th><th>MHH-Causality</th></tr>
+      <tr><td>Storage</td><td>KV pairs</td><td>Text files</td><td>Vector facts</td><td>Causal chains</td></tr>
+      <tr><td>Association</td><td>None</td><td>None</td><td>Co-occurrence</td><td>Causal strength</td></tr>
+      <tr><td>Recall</td><td>Exact match</td><td>File read</td><td>Semantic search</td><td>Causal traversal</td></tr>
+      <tr><td>Cross-Agent</td><td>❌</td><td>Difficult</td><td>✅</td><td>✅ Wiki-shared</td></tr>
+      <tr><td>Explainability</td><td>Low</td><td>Medium</td><td>Medium</td><td>High (clear chains)</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Use Cases</h2>
+    <p>• <strong>Personal AI Agent</strong> — Lifetime memory, shared across agents</p>
+    <p>• <strong>Team Memory Systems</strong> — Multi-agent collaboration; causal threads never lost</p>
+    <p>• <strong>Long-Term Projects</strong> — Chains record "why it was done", not just "what was done"</p>
+    <p>• <strong>Knowledge Management</strong> — Wiki 4-layer + causal links; readable in Obsidian</p>
+  </div>
+
+  <div class="section">
+    <h2>Quick Start</h2>
+    <pre>git clone https://github.com/YOUR_USERNAME/MHH-Causality-Memory.git
+cd MHH-Causality-Memory
+mkdir -p wiki/main/{events,timeline,relationships,abstracts}
+# Configure OpenClaw memory_search to start using</pre>
+  </div>
+
+  <div class="bottom-links">
+    <a href="https://github.com/YOUR_USERNAME/MHH-Causality-Memory" class="github-link">📂 GitHub Repository</a>
+  </div>
+
+  <div class="license">
+    <p><strong>MIT License</strong> — Free for personal/open-source use · Commercial use requires permission</p>
+    <p class="authors">Authors: <span>Vinson</span> & <span>牛马2号 (Niuma2)</span></p>
+  </div>
+</div>
+
+</div>
+<script>
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var tab = this.getAttribute('data-tab');
+    document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('tab-' + tab).classList.add('active');
+    this.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

@@ -1,166 +1,179 @@
-# MHH-Causality Memory
+# 因果记忆 CausaMem
 
-**因果记忆 — A memory system built on causal chains, designed for AI agents that live across a lifetime.**
+**Causal Memory — 为跨越一生的 AI Agent 而设计 / Built for AI agents that live across a lifetime**
+
+---
+
+## �🇨 中文 · Chinese
+
+### 它是什么
 
 人一生的记忆大约 100 万字符。给 AI Agent 200 万字符，它需要全部想起来吗？
 
-不需要。
+**不需要。**
 
 真正的记忆，不是仓库的堆叠，而是**因果之网**。每一个"果"都指向它的"因"，每一个"因"都通向它的"果"。当你触摸这张网的任意一个节点，整条因果链条就会自然浮现。
 
 MHH-Causality Memory 就是这张网。
 
----
+### 核心概念：因果关联
 
-## What It Does
-
-```
-Session 1: Agent learns "浩哥 refactored the memory system on 2026-04-18"
-Session 2: Agent asks "浩哥 最近在做什么？" → recalls the 04-18 refactor → traces back to
-            the 04-13 Wiki restructure → connects to the first OpenClaw session on 04-08
-            → understands the full evolution pattern without storing everything explicitly
-```
-
-普通的记忆系统是键值存储。MHH-Causality Memory 是因果之网。
-
----
-
-## Core Concept: 因果关联（Causality Links）
-
-**果的因，因的果。**
+> **果的因，因的果。**
 
 ```
-  Event A（因）
-      ↓ creates
-  Event B（果）
-      ↓ explains
-  Event C（果的果）→ ...形成联想链条
+Event A（因）
+    ↓ creates
+Event B（果）
+    ↓ explains
+Event C（果的果）→ ...形成联想链条
 ```
 
 记忆不是"记了什么"，而是**"什么导致了什么"**。
 
-当两个 agent（OpenClaw + Hermes）对话时：
-- Agent A 的记忆碎片，可以触发 Agent B 的因果链
-- Agent B 的因果链反向追溯，又激活 Agent A 的深层记忆
-- 因果链条像涟漪一样扩散，记忆自动"想到"而不是被"搜到"
-
----
-
-## Architecture
+### 架构
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  SURFACE LAYER（热层 — 当前上下文直接可读）              │
-│  当前 session 激活的因果节点，Agent 直接使用              │
-├─────────────────────────────────────────────────────────┤
-│  CAUSAL LAYER（因果层 — 因果链条）                      │
-│  果→因，因→果。每条边有权重：因果强度 + 时间距离          │
-├─────────────────────────────────────────────────────────┤
-│  SEMANTIC LAYER（语义层 — 向量 + FTS5）                │
-│  兜底搜索：精确词 → FTS5，语义相似 → 向量               │
-├─────────────────────────────────────────────────────────┤
-│  STRUCTURAL LAYER（结构层 — Wiki 四层）                 │
-│  事件层 / 时间线层 / 关系链层 / 抽象总结层               │
-└─────────────────────────────────────────────────────────┘
+SURFACE LAYER（热层）        ← 当前上下文直接可读
+CAUSAL LAYER（因果层）       ← 果→因，因→果，权重=因果强度×时间衰减
+SEMANTIC LAYER（语义层）     ← FTS5 精确 + 向量语义兜底
+STRUCTURAL LAYER（结构层）   ← Wiki 四层：事件/时间线/关系链/抽象
 ```
 
-**因果检索流程：**
+### 核心特性
 
-```
-触发节点 X
-    ↓
-沿因果边向外扩散（广度优先）
-    ↓
-按 权重 = 因果强度 × 时间衰减 排序
-    ↓
-截断至上下文上限（200万字符）
-    ↓
-返回因果链条，Agent 自然联想
-```
+| 特性 | 说明 |
+|------|------|
+| 🔗 因果关联 | 记忆之间以因果链条存储，不是孤立事实 |
+| 🔄 因果反向关联 | 结果可反向追溯原因，触发整条链条回忆 |
+| ⏱️ 因果强度衰减 | 随时间自然衰减，强因果（如人生重大决策）保留更久 |
+| 🎯 双引擎兜底 | FTS5 + 向量语义，命中<2条自动触发兜底 |
+| 📚 Wiki 四层结构 | 事件/时间线/关系链/抽象，可用 Obsidian 浏览 |
+| 🤝 跨 Agent 共享 | OpenClaw + Hermes 共用 Wiki，因果链跨 agent |
+| 🧠 一生记忆容量 | 200万字符上下文，按因果权重自动调度 |
+| ⚡ 零外部依赖 | 本地存储，可离线运行 |
 
----
-
-## Key Features
-
-- **因果关联** — 记忆之间不是孤立存储，而是因果链条，果的因、因的果，形成网络
-- **因果反向关联** — 结果可以反向追溯原因，触发整条链条的回忆
-- **因果强度衰减** — 因果关系随时间自然衰减，但强因果（如人生重大决策）保留更久
-- **双引擎兜底** — FTS5 精确匹配 + 向量语义搜索，命中少于2条时自动兜底
-- **Wiki 四层结构** — 事件 / 时间线 / 关系链 / 抽象总结，可直接用 Obsidian 浏览
-- **跨 Agent 共享** — OpenClaw 和 Hermes 可以共同读写的 Wiki，因果链跨 agent 传递
-- **一生记忆容量** — 200 万字符上下文，按因果权重 + 时间衰减自动调度，无需手动管理
-- **零外部依赖** — 本地存储，可离线运行
-
----
-
-## Quick Start
-
-```bash
-# 1. 克隆仓库
-git clone https://github.com/YOUR_USERNAME/MHH-Causality-Memory.git
-cd MHH-Causality-Memory
-
-# 2. 初始化 Wiki 结构
-mkdir -p wiki/main/{events,timeline,relationships,abstracts}
-cp templates/* wiki/main/
-
-# 3. 配置 OpenClaw memory_search
-# 在 openclaw.json 中添加 gbrain 路径
-
-# 4. 开始使用
-# 每次 session 后自动沉淀事件到 wiki 层
-# 向量索引自动更新
-```
-
----
-
-## Memory Capacity: 100 万字符 vs 200 万字符
-
-人的一生记忆约 100 万字符。给 Agent 200 万字符，不意味着全部加载。
-
-**调度策略：**
+### 记忆容量
 
 | 触发方式 | 加载范围 |
 |---------|---------|
-| 精确问答 | 相关因果链（约 1-5 个节点）|
-| 主题联想 | 整条因果链（约 10-20 个节点）|
-| 深度回顾 | 全量扫描 + 按权重排序（约 50-100 个节点）|
+| 精确问答 | 相关因果链（1-5 个节点） |
+| 主题联想 | 整条因果链（10-20 个节点） |
+| 深度回顾 | 全量扫描 + 权重排序（50-100 个节点） |
 
-不需要全量加载，只需要**触发的节点 + 因果链条**。
+### 适用场景
+
+- **个人 AI Agent** — 一生的记忆，跨 agent 共享
+- **团队记忆系统** — 多 agent 协作，因果脉络不丢失
+- **长期项目** — 记录"为什么这么做"，而不只是"做了什么"
+- **知识沉淀** — Wiki + 因果关联，可用 Obsidian 直接维护
+
+### 快速开始
+
+```bash
+git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
+cd MHH-Causality-Memory
+mkdir -p wiki/main/{events,timeline,relationships,abstracts}
+# 配置 OpenClaw memory_search 后即可使用
+```
+
+### 文件结构
+
+```
+MHH-Causality-Memory/
+├── README.md          ← 说明文档
+├── templates/         ← Wiki 层模板
+└── wiki/main/        ← Wiki 主目录
+    ├── events/       ← 事件层
+    ├── timeline/    ← 时间线层
+    ├── relationships/ ← 关系链层
+    └── abstracts/   ← 抽象总结层
+```
 
 ---
 
-## 因果记忆 vs 其他记忆系统
+## 🇺🇸 English
 
-| | 传统键值 | OpenClaw 默认 | S+Memory | MHH-Causality |
-|--|:-------:|:------------:|:--------:|:------------:|
-| **存储形式** | KV 对 | 文本文件 | 向量事实 | 因果链条 |
-| **关联方式** | 无 | 无 | 共现关系 | 因果强度 |
-| **召回方式** | 精确匹配 | 读文件 | 语义搜索 | 因果扩散 |
-| **跨 Agent** | ❌ | 困难 | ✅ | ✅ Wiki 共享 |
-| **可解释性** | 低 | 中 | 中 | 高（因果链清晰）|
+### What It Is
 
----
+A human's lifetime memory is roughly 1 million characters. Give an AI agent 2 million characters — does it need to recall all of it?
 
-## 适用场景
+**No.**
 
-- **个人 AI Agent** — 一生的记忆，跨 agent 共享（OpenClaw / Hermes / 其他）
-- **团队记忆系统** — 多 agent 协作时，记忆的因果脉络不会丢失
-- **长期项目** — 因果链条记录了"为什么这么做"，而不是"做了什么"
-- **知识沉淀** — Wiki 四层结构 + 因果关联，可直接用 Obsidian 阅读和维护
+Real memory is not a warehouse. It is a **causal web**. Every "effect" points to its "cause". Every "cause" leads to its "effect". When you touch any node of this web, the entire causal chain naturally emerges.
+
+MHH-Causality Memory is this web.
+
+### Core Concept: Causality Links
+
+> **The cause of the effect. The effect of the cause.**
+
+```
+Event A (cause)
+    ↓ creates
+Event B (effect)
+    ↓ explains
+Event C (effect of effect) → ...forming associative chains
+```
+
+Memory is not "what was stored" — it is **"what caused what"**.
+
+### Architecture
+
+```
+SURFACE LAYER          ← Directly readable in current context
+CAUSAL LAYER          ← effect→cause, cause→effect; weight = causal_strength × decay
+SEMANTIC LAYER        ← FTS5 exact + vector semantic fallback
+STRUCTURAL LAYER      ← Wiki 4-layer: Events / Timeline / Relationships / Abstracts
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| 🔗 Causality Links | Memory stored as causal chains, not isolated facts |
+| 🔄 Reverse Causation | Effects trace back to causes, triggering the whole chain |
+| ⏱️ Causal Decay | Causal strength decays over time; strong causes last longer |
+| 🎯 Dual-Engine Fallback | FTS5 exact + vector semantic; auto-fallback on <2 hits |
+| 📚 Wiki 4-Layer | Events / Timeline / Relationships / Abstracts — Obsidian-ready |
+| 🤝 Cross-Agent Shared | OpenClaw + Hermes share Wiki; causal chains cross agents |
+| 🧠 Lifetime Capacity | 2M char context; auto-scheduled by causal weight |
+| ⚡ Zero Dependencies | Local storage; works fully offline |
+
+### Memory Capacity
+
+| Trigger Type | Loaded Scope |
+|-------------|-------------|
+| Precise Q&A | Related causal chain (1–5 nodes) |
+| Thematic Association | Full causal chain (10–20 nodes) |
+| Deep Reflection | Full scan + weight sort (50–100 nodes) |
+
+### Use Cases
+
+- **Personal AI Agent** — Lifetime memory, shared across agents
+- **Team Memory Systems** — Multi-agent collaboration; causal threads never lost
+- **Long-Term Projects** — Chains record "why it was done"
+- **Knowledge Management** — Wiki + causal links; maintainable in Obsidian
+
+### Quick Start
+
+```bash
+git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
+cd MHH-Causality-Memory
+mkdir -p wiki/main/{events,timeline,relationships,abstracts}
+# Configure OpenClaw memory_search to start using
+```
 
 ---
 
 ## License
 
-**开源协议：MIT**
+**MIT License**
 
-- ✅ 个人使用：免费
-- ✅ 开源项目：免费
-- ❌ 商业使用：需联系授权
+- ✅ Personal / open-source use: free
+- ❌ Commercial use: requires permission
 
-如需商业授权，请联系：[邮箱地址]
+Contact: 3871169@qq.com
 
 ---
 
-Built with ❤️ for AI agents that deserve a lifetime of memory.
+**Authors: Vinson & 牛马2号 (Niuma2)**
