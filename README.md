@@ -1,202 +1,153 @@
-# CausaMem — 因果记忆 | Causal Memory for AI Agents
+# 🔗 CausaMem - 因果记忆系统
 
-**让 OpenClaw 和 Hermes 建立一生的记忆**
-*Build lifelong memory for AI Agents — A causal memory system based on causal chains*
+> 让 AI Agent 拥有一生的记忆 | Causal Memory System for AI Agents
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/MaiHHConnect/MHH-Causality-Memory?style=social)](https://github.com/MaiHHConnect/MHH-Causality-Memory)
-[![GitHub forks](https://img.shields.io/github/forks/MaiHHConnect/MHH-Causality-Memory?style=social)](https://github.com/MaiHHConnect/MHH-Causality-Memory)
+[English](README_en.md) | 中文 | [日本語](README_ja.md) | [한국어](README_ko.md)
 
 ---
 
-## 🌐 Languages / 语言
+## 项目背景
 
-> **English** (default) | [中文介绍](#-中文介绍)
+CausaMem 是独立的 AI Agent 记忆系统。在开发完成后，我们参考了 [Claude-Mem](https://github.com/thedotmack/claude-mem)，借鉴并实现了其核心的 **AI 结构化压缩** 功能，并在此基础上扩展了 **因果推理** 能力。
 
----
+## 核心特性
 
-## What It Is
+| 特性 | 说明 |
+|------|------|
+| 四层记忆结构 | 事件 → 时间线 → 关系链 → 抽象总结 |
+| AI 结构化压缩 | 自动提取 decided/learned/completed/next_steps |
+| 因果推理 | 自动推断 cause（前因）/ effect（后果） |
+| 双引擎检索 | 向量语义搜索 + FTS5 全文搜索 + 因果链搜索 |
+| Wiki 人类可读 | Obsidian Wiki 格式，可直接阅读修改 |
+| 类型标签 | DECISION / INSIGHT / BUG / FEATURE / CHANGE / DAILY |
 
-A human's lifetime memory is roughly **1 million characters**. Give an AI agent **2 million characters** of context — does it need to recall all of it?
-
-**No.**
-
-Real memory is not a warehouse. It is a **causal web**. Every "effect" points to its "cause". Every "cause" leads to its "effect". When you touch any node of this web, the entire causal chain naturally emerges.
-
-**CausaMem** is this web — a causal memory system for AI agents that live across a lifetime.
-
----
-
-## Core Concept: Causality Links
-
-> **The cause of the effect. The effect of the cause.**
+## 架构图
 
 ```
-Event A (cause)
-    ↓ creates
-Event B (effect)
-    ↓ explains
-Event C (effect of effect) → ...forming associative chains
+┌─────────────────────────────────────────┐
+│         Context (Limited Space)           │
+│  ┌─────────────────────────────────┐   │
+│  │ SOUL.md     - Identity/Soul        │   │
+│  │ USER.md     - User Info            │   │
+│  │ MEMORY.md   - Index + Pointers    │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+                    ↓ Load on demand
+┌─────────────────────────────────────────┐
+│         External Memory (Unlimited)       │
+│  ┌─────────────────────────────────┐   │
+│  │ events/    - Event Layer          │   │
+│  │ timeline/  - Timeline Layer       │   │
+│  │ relations/ - Relationship Layer   │   │
+│  │ abstracts/ - Abstract Layer        │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
 ```
 
-Memory is not "what was stored" — it is **"what caused what"**.
+## 快速开始
 
-When two agents (OpenClaw + Hermes) converse, Agent A's memory fragments can trigger Agent B's causal chain. The chain ripples outward — memory is **recalled**, not searched.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  SURFACE LAYER                                               │
-│  Directly readable in current context                         │
-├─────────────────────────────────────────────────────────────┤
-│  CAUSAL LAYER                                               │
-│  effect→cause, cause→effect                                 │
-│  Edge weight = causal_strength × temporal_decay              │
-├─────────────────────────────────────────────────────────────┤
-│  SEMANTIC LAYER                                             │
-│  FTS5 exact match + vector semantic search fallback          │
-├─────────────────────────────────────────────────────────────┤
-│  STRUCTURAL LAYER — Wiki 4-Layer                           │
-│  Events / Timeline / Relationships / Abstracts               │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Key Features
-
-| | Feature | Description |
-|--|---------|-------------|
-| 🔗 | **Causality Links** | Memory stored as causal chains, not isolated facts |
-| 🔄 | **Reverse Causation** | Effects trace back to causes, triggering the whole chain |
-| ⏱️ | **Causal Decay** | Causal strength decays over time; strong causes last longer |
-| 🎯 | **Dual-Engine Fallback** | FTS5 exact + vector semantic; auto-fallback on <2 hits |
-| 📚 | **Wiki 4-Layer** | Events / Timeline / Relationships / Abstracts — Obsidian-ready |
-| 🤝 | **Cross-Agent Shared** | OpenClaw + Hermes share Wiki; causal chains cross agents |
-| 🧠 | **Lifetime Capacity** | 2M char context; auto-scheduled by causal weight + decay |
-| ⚡ | **Zero Dependencies** | Local storage; works fully offline |
-
----
-
-## Memory Capacity: 1M vs 2M Characters
-
-| Trigger Type | Loaded Scope |
-|-------------|-------------|
-| Precise Q&A | Related causal chain (1–5 nodes) |
-| Thematic Association | Full causal chain (10–20 nodes) |
-| Deep Reflection | Full scan + weight sort (50–100 nodes) |
-
-You don't load everything. You load **the triggered node + its causal chain**.
-
----
-
-## Comparison
-
-| | KV Store | OpenClaw Default | S+Memory | CausaMem |
-|--|:--------:|:---------------:|:--------:|:--------:|
-| **Storage** | KV pairs | Text files | Vector facts | Causal chains |
-| **Association** | None | None | Co-occurrence | Causal strength |
-| **Recall** | Exact match | File read | Semantic search | Causal traversal |
-| **Cross-Agent** | ❌ | Difficult | ✅ | ✅ Wiki-shared |
-| **Explainability** | Low | Medium | Medium | High (clear chains) |
-
----
-
-## Quick Start
+### 1. 克隆
 
 ```bash
-# Clone
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
-
-# Initialize
-bash scripts/setup.sh
-
-# Configure OpenClaw memory_search to point to scripts/gbrain/search.py
 ```
 
----
+### 2. 安装依赖
 
-## File Structure
+```bash
+# Python 依赖
+pip install requests
+
+# 向量模型 (可选，向量搜索用)
+# 需要 SiliconFlow API Key
+```
+
+### 3. 配置 API Key
+
+```bash
+export MINIMAX_API_KEY="your-minimax-key"
+export SILICONFLOW_API_KEY="your-siliconflow-key"
+```
+
+### 4. 初始化
+
+```bash
+cd scripts/gbrain
+python gbrain.py init
+```
+
+### 5. 使用
+
+```bash
+# 写入带结构化压缩的记忆
+python gbrain.py put-structured memory-2026-04 "我们讨论了记忆系统，决定采用四层结构"
+
+# AI 压缩观测（查看结构化输出）
+python gbrain.py compress "你的观测内容"
+
+# 向量语义搜索
+python gbrain.py query "记忆系统"
+
+# FTS5 全文搜索
+python gbrain.py search "四层结构"
+
+# 因果链搜索
+python gbrain.py causal "记忆系统"
+```
+
+## 借鉴说明
+
+本项目在开发过程中参考了 [Claude-Mem](https://github.com/thedotmack/claude-mem)：
+
+| 借鉴内容 | 来源 | 说明 |
+|----------|------|------|
+| AI 结构化压缩 | Claude-Mem Session Summary | 将自由文本压缩为结构化字段 |
+| 字段设计 | Claude-Mem | learned / completed / next_steps 等字段 |
+| 类型标签系统 | Claude-Mem | 按类型组织观测记录 |
+
+> Claude-Mem 是 TheDotMack 开发的高级 Claude Code 记忆插件，采用 SQLite + Chroma 向量库架构。本项目在其基础上独立实现了因果推理和 Wiki 格式存储。
+
+## 目录结构
 
 ```
 MHH-Causality-Memory/
-├── README.md              ← This file
-├── preview.html           ← Bilingual preview (with tab switching, for local use)
+├── README.md
+├── README_en.md           # English
+├── README_ja.md           # 日本語
+├── README_ko.md           # 한국어
+├── docs/                  # 文档
+│   ├── 01_记忆系统架构说明.md
+│   └── 安装指南.md
 ├── scripts/
-│   ├── setup.sh          ← One-time initialization
-│   ├── gbrain/           ← Vector search engine
-│   │   ├── search.py     ← Search entry point
-│   │   ├── ingest.py     ← Batch import
-│   │   ├── init.py       ← DB initialization
-│   │   └── stats.py      ← Status check
-│   └── wiki/templates/   ← Wiki layer templates
-├── wiki/main/             ← Wiki directory (empty, ready to use)
-│   ├── events/           ← Event layer
-│   ├── timeline/         ← Timeline layer
-│   ├── relationships/    ← Relationship layer
-│   └── abstracts/        ← Abstract layer
-└── docs/
-    └── 安装指南.md        ← Installation guide (Chinese)
+│   ├── setup.sh           # 一键安装脚本
+│   └── gbrain/
+│       ├── gbrain.py      # 核心脚本（含 AI 压缩）
+│       ├── search.py       # 搜索脚本
+│       ├── ingest.py       # 批量导入
+│       ├── stats.py        # 统计
+│       ├── init.py         # 初始化
+│       └── brain.db.placeholder
+└── wiki/                  # Wiki 模板
+    └── templates/
 ```
 
----
+## 技术栈
 
-## Use Cases
-
-- **Personal AI Agent** — Lifetime memory shared across OpenClaw / Hermes / other agents
-- **Team Memory** — Multi-agent collaboration; causal threads never lost
-- **Long-Term Projects** — Chains record "why it was done", not just "what was done"
-- **Knowledge Management** — Wiki 4-layer + causal links; maintainable in Obsidian
-
----
+- **存储**: SQLite
+- **向量搜索**: SiliconFlow Qwen3-Embedding-8B
+- **AI 压缩**: MiniMax API / OpenAI Compatible
+- **格式**: Obsidian Wiki (Markdown)
 
 ## License
 
-**MIT License** — Free for personal/open-source use · Commercial use requires permission
+MIT License
 
-Contact: **3871169@qq.com**
+## 作者
+
+- [Vinson](https://github.com/MaiHHConnect)
+- [牛马2号](https://github.com/openclaw) (AI Agent)
 
 ---
 
-**Authors: Vinson & 牛马2号 (Niuma2)**
-
----
-
-## 🇨🇳 中文介绍
-
-人一生的记忆大约 **100 万字符**。给 AI Agent **200 万字符**，它需要全部想起来吗？
-
-**不需要。**
-
-真正的记忆，不是仓库的堆叠，而是**因果之网**。每一个"果"都指向它的"因"，每一个"因"都通向它的"果"。当你触摸这张网的任意一个节点，整条因果链条就会自然浮现。
-
-**因果记忆 CausaMem** 就是这张网。
-
-### 核心理念
-
-> **果的因，因的果。**
-
-记忆不是"记了什么"，而是**"什么导致了什么"**。
-
-### 架构
-
-| 层级 | 说明 |
-|------|------|
-| Surface Layer（热层） | 当前上下文直接可读 |
-| Causal Layer（因果层） | 果→因，因→果，权重=因果强度×时间衰减 |
-| Semantic Layer（语义层） | FTS5 精确 + 向量语义兜底 |
-| Structural Layer（结构层） | Wiki 四层：事件/时间线/关系链/抽象 |
-
-### 安装
-
-```bash
-git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
-cd MHH-Causality-Memory
-bash scripts/setup.sh
-```
-
-详细安装指南见 `docs/安装指南.md`
+*Built for AI Agents that remember.*
