@@ -10,73 +10,78 @@
 
 ## Background
 
-CausaMem is an independent AI Agent memory system. It enables agents to:
-- **Remember** — Auto-structured compression of events
-- **Understand** — Auto causal reasoning
-- **Reason** — Cross-timeline relationship discovery
-- **Recall** — Full context at any moment
+CausaMem is an **independently developed** AI Agent memory system created by Vinson and AI Agent 牛马2号.
 
-## Architecture
+Core philosophy: Give AI agents human-like memory capabilities.
+
+## Core Features
+
+### 1. Causal Reasoning (Core Innovation)
+Automatically infer **cause** and **effect** from events, turning isolated facts into traceable causal chains.
 
 ```
-┌──────────────────────────────────────────────┐
-│           AI Agent                              │
-├──────────────────────────────────────────────┤
-│  SOUL.md / USER.md / MEMORY.md  (startup)    │
-│  memory/YYYY-MM-DD.md       (daily raw)        │
-│  gbrain.db                 (vector+FTS5)       │
-│  wiki/                     (4-layer wiki)       │
-│  Dream (Cron)              (causal abstraction)│
-└──────────────────────────────────────────────┘
+Input: "Discussed memory system, decided to use four-layer structure"
+Output:
+  cause: "Previous architecture was too simple"
+  effect: "Laid foundation for subsequent development"
 ```
 
-## Three Core Modules
+### 2. AI Structured Compression
+Each memory write automatically compresses free text into structured fields:
 
-### Module 1: Causal Memory (gbrain)
+| Field | Description |
+|-------|-------------|
+| decided | What was decided |
+| learned | What was learned |
+| completed | What was completed |
+| next_steps | Next steps |
+| concepts | Concept tags (2-4) |
+| cause | Cause |
+| effect | Effect |
 
-```bash
-# Write memory with causal inference
-python gbrain.py put-structured my-event "Discussed system design, decided to use X architecture"
+### 3. Dual-Engine Search
+Three complementary search modes:
 
-# Output: {decided, learned, completed, next_steps, cause, effect, concepts}
+| Engine | Command | Best For |
+|--------|---------|----------|
+| Vector | `gbrain.py query` | Semantic similarity |
+| FTS5 | `gbrain.py search` | Exact keyword |
+| Causal | `gbrain.py causal` | Cause/Effect search |
+
+### 4. Wiki Four-Layer Structure
+Human-readable, editable structured knowledge base:
+
+```
+wiki/
+├── events/        # Event layer: who+what+result+emotion
+├── timeline/      # Timeline layer: chronological
+├── relations/     # Relation layer: causal/correlated
+└── _dream/      # Abstract layer: dream output
 ```
 
-**Three search modes:**
-```bash
-python gbrain.py query "system design"   # Vector semantic
-python gbrain.py search "architecture"   # FTS5 full-text
-python gbrain.py causal "design"         # Causal chain
-```
-
-### Module 2: Wiki Four-Layer Structure
-
-| Layer | Path | Description |
-|-------|------|-------------|
-| Events | `events/` | Who + what + result |
-| Timeline | `timeline/` | Chronological串联 |
-| Relations | `relations/` | Causal / correlated links |
-| Abstracts | `_dream/` | Dream output (causal chains + phase analysis) |
-
-### Module 3: Dream Abstraction (Cron)
+### 5. Dream Abstraction (Cron)
+Periodic tasks for causal chains and abstract judgments:
 
 | Type | Schedule | Content |
 |------|----------|---------|
 | Small | Daily 02:30 | Filter important events |
-| Big | Weekly Thu 03:00 | Causal chains + phase judgments |
+| Big | Weekly Thu 03:00 | Causal chains + phase analysis |
 
-**Big Dream Output:**
-```markdown
-## Relationship Discovery
-- [Person A] and [Person B]: relationship description
+### 6. Type Tag System
+Organize memories by type: `DECISION` | `INSIGHT` | `BUG` | `FEATURE` | `CHANGE` | `DAILY`
 
-## Phase Judgments
-- [Project]: current phase: [judgment]
+### 7. Multi-Agent Sharing
+Filesystem-based storage, multiple agents can access simultaneously.
 
-## Causal Chain
-- Event A → Event B → Event C
+## Architecture
 
-## Future Implications
-- [Actionable next step]
+```
+AI Agent
+  ├── SOUL.md / USER.md / MEMORY.md  (startup)
+  ├── memory/YYYY-MM-DD.md            (daily raw)
+  ├── gbrain.db                       (vector+FTS5)
+  ├── wiki/                           (4-layer wiki)
+  └── Dream Cron                      (causal abstraction)
 ```
 
 ## Quick Start
@@ -85,22 +90,21 @@ python gbrain.py causal "design"         # Causal chain
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
 cd MHH-Causality-Memory
 pip install requests
-
-# Optional: API keys for AI compression
 export MINIMAX_API_KEY="your-key"
 export SILICONFLOW_API_KEY="your-key"
-
 cd scripts/gbrain
 python gbrain.py init
 
-# Write memory
-python gbrain.py put-structured my-event "Discussed memory system"
+# Write memory (auto compression + causal inference)
+python gbrain.py put-structured my-event "Discussed system design"
 
-# Search
-python gbrain.py causal "memory system"
+# Three search modes
+python gbrain.py causal "system design"
+python gbrain.py query "design"
+python gbrain.py search "architecture"
 ```
 
-## Cron Setup (Optional)
+## Cron Setup
 
 ```bash
 crontab -e
@@ -111,6 +115,28 @@ crontab -e
 # Big Dream: Weekly Thu 03:00
 0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
+
+## Project Structure
+
+```
+MHH-Causality-Memory/
+├── README.md
+├── docs/
+│   ├── 01_记忆系统架构说明.md
+│   └── 安装指南.md
+├── scripts/
+│   ├── setup.sh
+│   ├── dream.py
+│   └── gbrain/
+│       ├── gbrain.py
+│       └── ...
+└── wiki/
+    ├── _dream/
+    ├── events/
+    ├── timeline/
+    └── relations/
+```
+
 ## License
 
 MIT License

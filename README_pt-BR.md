@@ -1,30 +1,24 @@
-# CausaMem - Sistema de Memória Causal
+# CausaMem - Causal Memory System
 
-> Dê ao seu Agente de IA uma memória vitalícia | Causal Memory System for AI Agents
-
-[English](README_en.md) | [中文](README.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [繁體中文](README_zh-TW.md) | Português (BR) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | [Русский](README_ru.md) | [Italiano](README_it.md) | [Polski](README_pl.md) | [Українська](README_uk.md) | [Tiếng Việt](README_vi.md) | [Indonesia](README_id.md) | [ไทย](README_th.md) | [हिन्दी](README_hi.md) | [Nederlands](README_nl.md) | [Türkçe](README_tr.md) | [Svenska](README_sv.md) | [Ελληνικά](README_el.md) | [Magyar](README_hu.md) | [Čeština](README_cs.md) | [Dansk](README_da.md) | [Norsk](README_no.md) | [Suomi](README_fi.md) | [Română](README_ro.md) | [العربية](README_ar.md) | [עברית](README_he.md) | [বাংলা](README_bn.md) | [اردو](README_ur.md) | [Português PT](README_pt-PT.md)
+> Give your AI Agent a lifetime of memory
 
 ---
 
-## Visão Geral
+## Overview
 
-CausaMem é um sistema de memória independente para Agentes de IA com três módulos principais:
+CausaMem is an **independently developed** AI Agent memory system with 7 core features:
 
-| Módulo | Descrição |
-|--------|-----------|
-| Memória Causal (gbrain) | Compressão estruturada + Raciocínio causal + 3 modos de busca |
-| Wiki 4 camadas | Eventos→Linha do tempo→Relações→Abstrações |
-| Sonhar (Cron) | Encadeamento causal periódico + Julgamentos abstratos |
+| Feature | Description |
+|---------|-------------|
+| Causal Reasoning | Auto infer cause/effect |
+| AI Compression | Structured fields: decided/learned/completed/next_steps/concepts/cause/effect |
+| Dual Search | Vector + FTS5 + Causal chain |
+| Wiki 4-Layer | events/timeline/relations/_dream |
+| Dream Cron | Periodic causal abstraction (daily 02:30 / weekly Thu 03:00) |
+| Type Tags | DECISION/INSIGHT/BUG/FEATURE/CHANGE/DAILY |
+| Multi-Agent | Filesystem-based sharing |
 
-## Arquitetura
-
-```
-Memória de inicialização → SOUL.md / USER.md / MEMORY.md
-Memória de trabalho → memory/*.md + gbrain + wiki/
-Execução periódica → Pequena organização(diário 02:30) + Grande sonho(semanal qui 03:00)
-```
-
-## Início rápido
+## Quick Start
 
 ```bash
 git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
@@ -32,32 +26,23 @@ cd MHH-Causality-Memory
 pip install requests
 cd scripts/gbrain
 python gbrain.py init
-
-# Salvar
-python gbrain.py put-structured my-event "Discutiu o design do sistema, decidiu usar a arquitetura X"
-
-# Buscar
-python gbrain.py causal "design sistema"  # Causal
-python gbrain.py query "design"           # Vetor
-python gbrain.py search "arquitetura"    # FTS5
+python gbrain.py put-structured my-event "Discussed design"
+python gbrain.py causal "design"
 ```
 
-## Configuração Cron (Sonhos)
+## Cron Setup
 
 ```bash
 crontab -e
-
-# Pequena organização: Diário 02:30
 30 2 * * * cd /path/to/MHH-Causality-Memory && python scripts/dream.py small
-
-# Grande sonho: Semanal qui 03:00
 0 3 * * 4 cd /path/to/MHH-Causality-Memory && python scripts/dream.py big
 ```
-## Licença
+
+## License
 
 MIT License
 
-## Autores
+## Authors
 
 - [Vinson](https://github.com/MaiHHConnect)
-- [牛馬2号](https://github.com/openclaw) (AI Agent)
+- [牛马2号](https://github.com/openclaw) (AI Agent)
