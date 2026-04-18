@@ -12,7 +12,7 @@
 
 **Memory is not about accumulation—it's about how you remember.**
 
-A human's lifetime memory is roughly 1 million characters. An AI agent's context window is larger (2 million characters). But stacking information isn't effective memory. The real question is: **How do you make memory work like a human's—connecting dots into lines, lines into planes, forming a traceable, reasoning-enabled causal network?**
+A human's lifetime memory is roughly 1 million characters. An AI agent's context window is larger (capped at 2 million characters). This capacity is sufficient for an agent's lifetime. But stacking information isn't effective memory. The real question is: **How do you make memory work like a human's—connecting dots into lines, lines into planes, forming a traceable, reasoning-enabled causal network?**
 
 CausaMem's answer: **Four-Layer Structured Memory + 13-Dimensional Causal Reasoning**
 
