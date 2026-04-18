@@ -261,9 +261,18 @@ MHH-Causality-Memory/
 
 ---
 
+---
+
 ## License
 
-MIT License
+**CC BY-NC 4.0** (Creative Commons Attribution-NonCommercial 4.0)
+
+**Commercial use requires explicit permission from the authors.**
+
+📧 Contact: 3871169@qq.com
+
+For details, see [LICENSE](LICENSE) file.
+
 
 ## 作者
 
