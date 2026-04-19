@@ -1,6 +1,4 @@
-# CausaMem - 永久性记忆，因果记忆系统
-
-## Causal Memory System for AI Agents
+# CausaMem v0.15 - Causal Memory System for AI Agents
 
 > 让 AI Agent 拥有一生的记忆 | Permanent Memory for Life | 一记记一生
 
@@ -69,6 +67,52 @@ python gbrain.py causal "system design"
 30 2 * * * python scripts/dream.py small
 0 3 * * 4 python scripts/dream.py big
 ```
+
+---
+
+## Agent Skill Ecosystem (v0.15)
+
+CausaMem v0.15 ships with two complementary Skills for OpenClaw:
+
+### [self-improving](https://github.com/clawhub/clawhub/tree/main/skills/self-improving) — Execution Quality
+
+> After each task: what went well? What can be improved? What will I do differently next time?
+
+```bash
+clawhub install self-improving
+```
+
+**CausaMem联动:** When causal memory triggers a domain, automatically read the corresponding domain file to chain execution lessons into the causal network.
+
+---
+
+### [proactivity](https://github.com/clawhub/clawhub/tree/main/skills/proactivity) — Proactive Behavior
+
+> Not just reactive—anticipate missing steps, keep momentum, recover from interruptions.
+
+```bash
+clawhub install proactivity
+```
+
+**CausaMem联动:** When driving proactive behavior, proactively link to relevant cases and lessons from causal memory as decision references.
+
+---
+
+### Three-System Memory Architecture
+
+```
+CausaMem (Causal Memory) ←→ self-improving (Execution Quality) ←→ proactivity (Proactive Behavior)
+     ↓                          ↓                          ↓
+  Knowledge Trigger         Lesson Consolidation       Action Driver
+  Passive Wake-up           Passive Write-in           Active Drive
+```
+
+**Linkage:**
+- CausaMem: "How is this related to past events因果?"
+- self-improving: "What did this teach me?"
+- proactivity: "What should I do next proactively?"
+
+Three systems remain independent, naturally chained via OpenClaw's AGENTS.md routing layer—no manual intervention required.
 
 ---
 
