@@ -370,8 +370,4 @@ CausaMem（因果记忆）←→ self-improving（执行质量）←→ proactiv
 
 ---
 
-
-
----
-
 *Built for AI Agents that remember.*
