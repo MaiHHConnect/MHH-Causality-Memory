@@ -1,4 +1,4 @@
-# 🔗 CausaMem - 永久性记忆，因果记忆系统
+# 🔗 CausaMem - 永久性记忆，因果记忆系统 v0.15
 
 > 让 AI Agent 拥有一生的记忆 | Causal Memory System for AI Agents
 
@@ -318,6 +318,58 @@ For details, see [LICENSE](LICENSE) file.
 
 ---
 
+## Agent Skill 生态配套
+
+CausaMem v0.15 配套两个增强 Skill，通过 OpenClaw 的 clawhub 安装：
+
+### [self-improving](https://github.com/clawhub/clawhub/tree/main/skills/self-improving) — 执行质量固化
+
+> 每次任务结束后自动反思：这次哪里做得好？哪里可以改进？下次怎么做更好？
+
+**核心文件：** `memory.md`（HOT层偏好）/ `corrections.md`（纠错日志）/ `domains/`（领域教训）/ `projects/`（项目教训）
+
+```bash
+# 安装
+clawhub install self-improving
+```
+
+**与 CausaMem 联动：** 当因果记忆触发某个领域时，自动读对应 domain 文件，将执行教训串联进因果链。
+
+---
+
+### [proactivity](https://github.com/clawhub/clawhub/tree/main/skills/proactivity) — 前瞻行为驱动
+
+> 不只被动响应，主动发现遗漏步骤、保持任务动量、从中断中恢复。
+
+**核心文件：** `memory.md`（行为边界）/ `session-state.md`（当前任务状态）/ `patterns.md`（成功主动模式）
+
+```bash
+# 安装
+clawhub install proactivity
+```
+
+**与 CausaMem 联动：** 前瞻驱动时，主动关联因果记忆中的相关案例和教训，作为行动决策的参考依据。
+
+---
+
+### 三套系统并存的记忆架构
+
+```
+CausaMem（因果记忆）←→ self-improving（执行质量）←→ proactivity（前瞻行为）
+     ↓                        ↓                        ↓
+  知识触发                    教训固化                行动驱动
+  被动唤醒                    被动写入                主动驱动
+```
+
+**联动机制：**
+- CausaMem 负责"这件事和之前的因果关联"
+- self-improving 负责"这件事教会了我什么"
+- proactivity 负责"接下来应该主动做什么"
+
+三套系统保持独立，通过 OpenClaw 的 AGENTS.md 路由层自然串联，无需手动干预。
+
+---
+
 ## 社区衍生版本
 
 ### 浩哥助手改造版
@@ -336,7 +388,7 @@ For details, see [LICENSE](LICENSE) file.
 # gbrain 位置
 ~/gbrain-data/gbrain.py
 
-# 已导入记忆：48个页面，45个向量
+# 已导入记忆：290个页面，290个向量
 gbrain.py stats
 
 # 向量搜索测试
@@ -350,8 +402,11 @@ gbrain.py query "记忆系统"
 - Markdown格式文件人类可直接读写
 
 **相关文件：**
-- 浩哥助手记忆标准：`~/.openclaw/workspace/memory/MEMORY-STANDARD.md`
-- 因果思维特点：`~/.openclaw/workspace/memory/MEMORY-STANDARD.md`
+- 记忆系统标准：`~/.openclaw/workspace-main/memory/`（每日日记）
+- 因果记忆库：`~/.openclaw/workspace-main/memory-wiki/`（四层结构 wiki）
+- gbrain 向量库：`~/gbrain-data/brain.db`（289 pages, 289 embeddings）
+- self-improving 教训库：`~/self-improving/domains/`（执行质量固化）
+- proactivity 行为状态：`~/proactivity/session-state.md`（前瞻驱动状态）
 
 ---
 
