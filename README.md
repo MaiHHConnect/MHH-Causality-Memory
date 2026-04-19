@@ -370,43 +370,7 @@ CausaMem（因果记忆）←→ self-improving（执行质量）←→ proactiv
 
 ---
 
-## 社区衍生版本
 
-### 浩哥助手改造版
-
-基于 CausaMem 框架，浩哥助手进行了以下增强集成：
-
-| 功能 | 说明 | 状态 |
-|------|------|------|
-| OpenClaw集成 | 与memory_search深度集成，memory_search自动触发gbrain兜底 | ✅ |
-| 双向链接格式 | Wiki格式 `[[因果→]]` / `[[因果←]]` | ✅ |
-| 记忆触发记录 | recall_count跟踪，高频记忆自动提拔到长期记忆 | ✅ |
-| OpenClaw做梦 | 集成OpenClaw内置做梦系统，自动抽象总结 | ✅ |
-
-**部署情况：**
-```bash
-# gbrain 位置
-~/gbrain-data/gbrain.py
-
-# 已导入记忆：290个页面，290个向量
-gbrain.py stats
-
-# 向量搜索测试
-gbrain.py query "记忆系统"
-```
-
-**特点：**
-- 保留CausaMem所有功能
-- 与OpenClaw记忆系统无缝集成
-- 利用OpenClaw内置做梦做自动抽象总结
-- Markdown格式文件人类可直接读写
-
-**相关文件：**
-- 记忆系统标准：`~/.openclaw/workspace-main/memory/`（每日日记）
-- 因果记忆库：`~/.openclaw/workspace-main/memory-wiki/`（四层结构 wiki）
-- gbrain 向量库：`~/gbrain-data/brain.db`（289 pages, 289 embeddings）
-- self-improving 教训库：`~/self-improving/domains/`（执行质量固化）
-- proactivity 行为状态：`~/proactivity/session-state.md`（前瞻驱动状态）
 
 ---
 
