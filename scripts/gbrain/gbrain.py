@@ -18,7 +18,7 @@ SILICONFLOW_API = "https://api.siliconflow.cn/v1"
 SILICONFLOW_KEY = os.environ.get("SILICONFLOW_API_KEY", "")
 
 EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-8B"
-EMBEDDING_DIM = 1024  # Qwen3-Embedding-8B output dim
+EMBEDDING_DIM = 4096  # Qwen3-Embedding-8B actual output
 
 # ── DB Init ─────────────────────────────────────────────────────────────────
 def get_db() -> sqlite3.Connection:
@@ -216,9 +216,11 @@ JSON："""
         resp = requests.post(
             "https://api.minimaxi.com/v1/text/chatcompletion_v2",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "MiniMax-M2.5", "messages": [{"role": "user", "content": prompt}], "max_tokens": 150},
+            json={"model": "MiniMax-M2.7", "messages": [{"role": "user", "content": prompt}], "max_tokens": 300},
+            verify=False,
             timeout=20)
-        text = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+        msg = resp.json().get("choices", [{}])[0].get("message", {})
+        text = msg.get("content", "") or msg.get("reasoning_content", "")
         m = re.search(r'\{.*\}', text, re.DOTALL)
         if m:
             return json.loads(m.group())
@@ -273,14 +275,18 @@ def _embed_page_async(page_id: int, text: str):
 
 # ── Search ───────────────────────────────────────────────────────────────────
 def search_fts(query: str, limit: int = 10) -> list[dict]:
-    conn = get_db()
     try:
-        rows = conn.execute("""
-            SELECT page_id, slug, title, snippet(page_fts_idx, 2, '**', '**', '...', 30) AS snippet
-            FROM page_fts_idx WHERE page_fts_idx MATCH ? ORDER BY rank LIMIT ?""",
+        raw = sqlite3.connect(GBRAIN_DB)
+        raw.row_factory = None
+        rows = raw.execute(
+            "SELECT f.page_id, f.slug, f.title "
+            "FROM page_fts f JOIN page_fts_idx idx USING(slug, title) "
+            "WHERE page_fts_idx MATCH ? ORDER BY rank LIMIT ?",
             (query, limit)).fetchall()
-        return [dict(r) for r in rows]
-    except Exception:
+        raw.close()
+        return [{"page_id": r[0], "slug": r[1], "title": r[2]} for r in rows]
+    except Exception as e:
+        print(f"[gbrain] FTS error: {e}", file=sys.stderr)
         return []
 
 def query_vector(question: str, limit: int = 5) -> list[dict]:
@@ -340,7 +346,7 @@ def compress_observation(raw_text: str, obs_type: str = "INSIGHT") -> dict:
     api_key = os.environ.get("MINIMAX_API_KEY", "") or os.environ.get("SILICONFLOW_API_KEY", "")
     if not api_key:
         return {"decided": raw_text[:100], "learned": "", "completed": "", "next_steps": "",
-                "concepts": [], "cause": "", "effect": "", "emotion": "无",
+                "concepts": [], "cause": "无", "effect": "无", "emotion": "无",
                 "summary_struct": {"type": obs_type, "raw": raw_text[:200]}}
 
     prompt = f"""分析以下观测记录，提取结构化信息。严格按JSON格式回复，不要有其他内容：
@@ -365,9 +371,11 @@ JSON格式：
         resp = requests.post(
             "https://api.minimaxi.com/v1/text/chatcompletion_v2",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "MiniMax-M2.5", "messages": [{"role": "user", "content": prompt}], "max_tokens": 250},
+            json={"model": "MiniMax-M2.7", "messages": [{"role": "user", "content": prompt}], "max_tokens": 800},
+            verify=False,
             timeout=30)
-        text = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+        msg = resp.json().get("choices", [{}])[0].get("message", {})
+        text = msg.get("content", "") or msg.get("reasoning_content", "")
         m = re.search(r'\{.*\}', text, re.DOTALL)
         if m:
             data = json.loads(m.group())
@@ -376,17 +384,17 @@ JSON格式：
                 "learned": data.get("learned", ""),
                 "completed": data.get("completed", ""),
                 "next_steps": data.get("next_steps", ""),
-                "concepts": data.get("concepts", []),
-                "cause": data.get("cause", ""),
-                "effect": data.get("effect", ""),
-                "emotion": data.get("emotion", "无"),
+                "concepts": data.get("concepts", []) or [],
+                "cause": data.get("cause", "") or "无",
+                "effect": data.get("effect", "") or "无",
+                "emotion": data.get("emotion", "") or "无",
                 "summary_struct": {"type": obs_type, "raw": raw_text[:500]}
             }
     except Exception as e:
         print(f"[gbrain] compress failed: {e}", file=sys.stderr)
 
     return {"decided": raw_text[:100], "learned": "", "completed": "", "next_steps": "",
-            "concepts": [], "cause": "", "effect": "", "emotion": "无",
+            "concepts": [], "cause": "无", "effect": "无", "emotion": "无",
             "summary_struct": {"type": obs_type, "raw": raw_text[:200]}}
 
 # ── Structured Put ───────────────────────────────────────────────────────────
@@ -465,9 +473,11 @@ def extract_and_set_tags(page_id: int, content: str):
         resp = requests.post(
             "https://api.minimaxi.com/v1/text/chatcompletion_v2",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "MiniMax-M2.5", "messages": [{"role": "user", "content": prompt}], "max_tokens": 40},
+            json={"model": "MiniMax-M2.7", "messages": [{"role": "user", "content": prompt}], "max_tokens": 80},
+            verify=False,
             timeout=10)
-        text = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        msg = resp.json().get("choices", [{}])[0].get("message", {})
+        text = (msg.get("content", "") or msg.get("reasoning_content", "")).strip()
         tags = [t.strip() for t in text.split(',') if t.strip()][:4]
         if tags:
             conn = get_db()
