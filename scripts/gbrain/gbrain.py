@@ -274,21 +274,6 @@ def _embed_page_async(page_id: int, text: str):
         print(f"[gbrain] embedding failed for page {page_id}: {e}", file=sys.stderr)
 
 # ── Search ───────────────────────────────────────────────────────────────────
-def search_fts(query: str, limit: int = 10) -> list[dict]:
-    try:
-        raw = sqlite3.connect(GBRAIN_DB)
-        raw.row_factory = None
-        rows = raw.execute(
-            "SELECT f.page_id, f.slug, f.title "
-            "FROM page_fts f JOIN page_fts_idx idx USING(slug, title) "
-            "WHERE page_fts_idx MATCH ? ORDER BY rank LIMIT ?",
-            (query, limit)).fetchall()
-        raw.close()
-        return [{"page_id": r[0], "slug": r[1], "title": r[2]} for r in rows]
-    except Exception as e:
-        print(f"[gbrain] FTS error: {e}", file=sys.stderr)
-        return []
-
 def query_vector(question: str, limit: int = 5) -> list[dict]:
     """Vector semantic search with time decay (SPlus-inspired)."""
     try:
@@ -315,19 +300,8 @@ def query_vector(question: str, limit: int = 5) -> list[dict]:
 
 def search_with_activation(query: str, limit: int = 5) -> list[dict]:
     """FTS + vector search + SPlus activation spread. Returns merged results."""
-    fts_results = search_fts(query, limit)
     vec_results = query_vector(query, limit)
-
-    # Deduplicate
-    seen = {r['page_id']: r for r in vec_results}
-    for r in fts_results:
-        pid = r.get('page_id')
-        if pid and pid not in seen:
-            seen[pid] = {"page_id": pid, "slug": r.get("slug", ""),
-                         "title": r.get("title", ""), "score": 0.5}
-
-    results = list(seen.values())
-    results.sort(key=lambda x: x.get("score", 0), reverse=True)
+    results = vec_results
     top_results = results[:limit]
 
     # Activation spread: bring in causally related pages
@@ -510,15 +484,6 @@ def cmd_get(slug: str):
     print(f"\n## Compiled Truth\n{row['compiled_truth'] or '(empty)'}")
     print(f"\n## Timeline\n{row['timeline'] or '(empty)'}")
 
-def cmd_search(query: str, limit: int = 10):
-    results = search_fts(query, limit)
-    if not results:
-        print("(no FTS results)")
-    for r in results:
-        print(f"  [{r['slug']}] {r['title']}")
-        if r.get('snippet'):
-            print(f"    {r['snippet']}")
-
 def cmd_query(question: str, limit: int = 5):
     """Vector search with time decay + activation spread."""
     all_results = search_with_activation(question, limit)
@@ -616,8 +581,6 @@ if __name__ == "__main__":
         cmd_put(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
     elif cmd == "get":
         cmd_get(sys.argv[2])
-    elif cmd == "search":
-        cmd_search(sys.argv[2] if len(sys.argv) > 2 else "")
     elif cmd == "query":
         cmd_query(sys.argv[2] if len(sys.argv) > 2 else "")
     elif cmd == "ingest":
