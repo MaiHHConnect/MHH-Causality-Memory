@@ -109,7 +109,6 @@ CausaMem 的答案：**四层结构化记忆 + 13 维因果推理**
 | 引擎 | 命令 | 适用场景 |
 |------|------|---------|
 | 向量语义 | `gbrain.py query` | 语义相近但表述不同 |
-| FTS5 全文 | `gbrain.py search` | 精确关键词匹配 |
 | 因果链 | `gbrain.py causal` | 搜索前因/后果 |
 
 ### 4. Wiki 四层结构
@@ -207,7 +206,7 @@ AI 的状态也可以被记录和追踪，作为因果链中的一个节点。
 │                    ↓                              │
 │  ┌────────────────────────────────────────┐  │
 │  │  memory/YYYY-MM-DD.md — 每日日记 raw   │  │
-│  │  gbrain.db             — 向量+FTS5 双引擎│  │
+│  │  gbrain.db             — 向量+因果双引擎  │  │
 │  │  wiki/                 — 四层结构可读     │  │
 │  └────────────────────────────────────────┘  │
 │                    ↓                              │
@@ -276,8 +275,8 @@ python gbrain.py causal "系统设计"
 # 向量语义搜索
 python gbrain.py query "架构方案"
 
-# FTS5 全文搜索
-python gbrain.py search "X架构"
+# 因果检索
+python gbrain.py causal "架构"
 ```
 
 ---
