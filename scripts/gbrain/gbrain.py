@@ -360,8 +360,8 @@ def compress_observation(raw_text: str, obs_type: str = "INSIGHT") -> dict:
 - completed: 完成了什么（已解决/实现，20字内）
 - next_steps: 下一步要做什么（待处理事项，20字内）
 - concepts: 概念标签（2-4个中文关键词数组）
-- cause: 前因——导致这个事件发生的原因（15字内，没有则写"无"）
-- effect: 后果——这个事件会导致什么后续变化（15字内，没有则写"无"）
+- cause: 前因——导致这个事件发生的原因（必须推断，15字内，禁止"无"）
+- effect: 后果——这个事件会导致什么后续变化（必须推断，15字内，禁止"无"）
 - emotion: 当前情绪，从以下选一个：开心|低落|饿|饱|累|精神|焦虑|专注|满足|空虚|无
 
 JSON格式：
@@ -371,7 +371,7 @@ JSON格式：
         resp = requests.post(
             "https://api.minimaxi.com/v1/text/chatcompletion_v2",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "MiniMax-M2.7", "messages": [{"role": "user", "content": prompt}], "max_tokens": 800},
+            json={"model": "MiniMax-M2.7", "messages": [{"role": "user", "content": prompt}], "max_tokens": 1500},
             verify=False,
             timeout=30)
         msg = resp.json().get("choices", [{}])[0].get("message", {})
