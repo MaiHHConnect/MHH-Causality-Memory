@@ -1,10 +1,10 @@
-# 🔗 CausaMem - 永久性记忆，因果记忆系统 v0.16
+# 🔗 CausaMem - 永久性记忆，因果记忆与认知锚定系统 v0.17
 
-> 让 AI Agent 拥有一生的记忆 | Causal Memory System for AI Agents
+> 让 AI Agent 拥有一生的记忆 | Causal Memory and Cognitive Anchoring for AI Agents
 
 ---
 
-🌐 **语言 / Language:** [🇺🇸 English](README_en.md) | [🇨🇳 中文](README_zh.md) | [🇯🇵 日本語](README_ja.md) | [🇰🇷 한국어](README_ko.md) | [🇹🇼 繁體中文](README_zh-TW.md) | [🇧🇷 Português (BR)](README_pt-BR.md) | [🇪🇸 Español](README_es.md) | [🇩🇪 Deutsch](README_de.md) | [🇫🇷 Français](README_fr.md) | [🇷🇺 Русский](README_ru.md) | [🇮🇹 Italiano](README_it.md) | [🇵🇱 Polski](README_pl.md) | [🇺🇦 Українська](README_uk.md) | [🇻🇳 Tiếng Việt](README_vi.md) | [🇮🇩 Indonesia](README_id.md) | [🇹🇭 ไทย](README_th.md) | [🇮🇳 हिन्दी](README_hi.md) | [🇳🇱 Nederlands](README_nl.md) | [🇹🇷 Türkçe](README_tr.md) | [🇸🇪 Svenska](README_sv.md) | [🇬🇷 Ελληνικά](README_el.md) | [🇭🇺 Magyar](README_hu.md) | [🇨🇿 Čeština](README_cs.md) | [🇩🇰 Dansk](README_da.md) | [🇳🇴 Norsk](README_no.md) | [🇫🇮 Suomi](README_fi.md) | [🇷🇴 Română](README_ro.md) | [🇸🇦 العربية](README_ar.md) | [🇮🇱 עברית](README_he.md) | [🇧🇩 বাংলা](README_bn.md) | [🇵🇰 اردو](README_ur.md) | [🇵🇹 Português (PT)](README_pt-PT.md)
+🌐 **语言 / Language:** [🇺🇸 English](i18n/README_en.md) | [🇨🇳 中文](i18n/README_zh.md) | [🇯🇵 日本語](i18n/README_ja.md) | [🇰🇷 한국어](i18n/README_ko.md) | [🇹🇼 繁體中文](i18n/README_zh-TW.md) | [🇧🇷 Português (BR)](i18n/README_pt-BR.md) | [🇪🇸 Español](i18n/README_es.md) | [🇩🇪 Deutsch](i18n/README_de.md) | [🇫🇷 Français](i18n/README_fr.md) | [🇷🇺 Русский](i18n/README_ru.md) | [🇮🇹 Italiano](i18n/README_it.md) | [🇵🇱 Polski](i18n/README_pl.md) | [🇺🇦 Українська](i18n/README_uk.md) | [🇻🇳 Tiếng Việt](i18n/README_vi.md) | [🇮🇩 Indonesia](i18n/README_id.md) | [🇹🇭 ไทย](i18n/README_th.md) | [🇮🇳 हिन्दी](i18n/README_hi.md) | [🇳🇱 Nederlands](i18n/README_nl.md) | [🇹🇷 Türkçe](i18n/README_tr.md) | [🇸🇪 Svenska](i18n/README_sv.md) | [🇬🇷 Ελληνικά](i18n/README_el.md) | [🇭🇺 Magyar](i18n/README_hu.md) | [🇨🇿 Čeština](i18n/README_cs.md) | [🇩🇰 Dansk](i18n/README_da.md) | [🇳🇴 Norsk](i18n/README_no.md) | [🇫🇮 Suomi](i18n/README_fi.md) | [🇷🇴 Română](i18n/README_ro.md) | [🇸🇦 العربية](i18n/README_ar.md) | [🇮🇱 עברית](i18n/README_he.md) | [🇧🇩 বাংলা](i18n/README_bn.md) | [🇵🇰 اردو](i18n/README_ur.md) | [🇵🇹 Português (PT)](i18n/README_pt-PT.md)
 
 ---
 
@@ -19,6 +19,14 @@ CausaMem 的答案：**四层结构化记忆 + 13 维因果推理**
 ```
 事件（点）→ 时间线（线）→ 关系链（面）→ 抽象总结（归因）
 ```
+
+当前版本进一步把 CausaMem 升级为 **因果记忆 + 认知锚定 + 受控写入门禁**：Agent 不再先猜答案再查记忆，而是在判断前先被事实、规则、历史决策、因果链和执行状态锚定。
+
+```text
+R0 现实证据层 -> C1 认知结构层 -> I2 直觉注入层
+```
+
+OpenClaw 集成后，CausaMem 会在 `before_prompt_build` 注入 `<causamem-cognitive-anchor>`，在 `agent_end` 捕获对话、提取候选、调用主模型判定，再由 CausaMem 确定性门禁只提交 approved 记忆。
 
 ---
 
@@ -53,7 +61,19 @@ CausaMem 的答案：**四层结构化记忆 + 13 维因果推理**
 
 ## 核心特性
 
-### 0. v0.16 重大升级：借鉴 SPlus + MemGPT
+### 0. v0.17 认知锚定与门禁写入
+
+| 能力 | 说明 |
+|------|------|
+| **认知锚定** | 判断前召回事实、规则、历史决策、因果链和执行状态 |
+| **R0/C1/I2 分层** | R0 现实证据层、C1 认知结构层、I2 直觉注入层 |
+| **OpenClaw hook** | `before_prompt_build` 自动注入认知锚，`agent_end` 自动捕获和写入 |
+| **Beads 接入** | Beads 作为 R0 执行追踪现实源，不替代 CausaMem 主记忆 |
+| **模型门禁** | OpenClaw 主模型只输出 JSON 判定，不直接写库 |
+| **确定性验收** | evidence 必须来自原文、Profile 置信度 ≥0.75、临时状态不写 Profile、冲突不覆盖 |
+| **召回回归** | 50 条真实项目记忆评测：`hit_rate=1.000`、`MRR=0.974` |
+
+### 1. v0.16 重大升级：借鉴 SPlus + MemGPT
 
 **借鉴来源：** `FalconOrtiz/SPlus-Memory`（激活传播+时序衰减）+ `MemGPT/Awella`（自动压缩）
 
@@ -73,7 +93,7 @@ CausaMem 的答案：**四层结构化记忆 + 13 维因果推理**
 | 记忆保鲜度 | ~40% | ~70% |
 | 综合评分 | 44分 | 74分 |
 
-### 1. 因果推理（13 维因果体系）
+### 2. 因果推理（13 维因果体系）
 自动从事件中推断 **cause（前因）** 和 **effect（后果）**，并按 13 个维度进行分析。
 
 ```
@@ -90,7 +110,7 @@ CausaMem 的答案：**四层结构化记忆 + 13 维因果推理**
   }
 ```
 
-### 2. AI 结构化压缩
+### 3. AI 结构化压缩
 每次写入记忆时，自动调用大模型将自由文本压缩为结构化字段：
 
 | 字段 | 说明 |
@@ -103,13 +123,34 @@ CausaMem 的答案：**四层结构化记忆 + 13 维因果推理**
 | cause | 前因 |
 | effect | 后果 |
 
-### 3. 双引擎检索
-三种检索方式，互补兜底：
+### 4. 多信号检索
+多种检索方式，互补兜底：
 
-| 引擎 | 命令 | 适用场景 |
-|------|------|---------|
-| 向量语义 | `gbrain.py query` | 语义相近但表述不同 |
-| 因果链 | `gbrain.py causal` | 搜索前因/后果 |
+| 引擎 | 适用场景 |
+|------|---------|
+| keyword / FTS | 精确词和标题匹配 |
+| vector | 语义相近但表述不同 |
+| lexical fallback | OpenClaw、GitHub、cron 等技术词精确补召回 |
+| causal edges | 搜索前因、后果、因果链 |
+| recency | 近期事实辅助排序 |
+
+融合流程：
+
+```text
+keyword + FTS + vector + lexical + causal + recency
+-> RRF ranking
+-> MMR deduplication
+-> causal activation
+-> cognitive anchor
+```
+
+### 5. 受控写入门禁
+
+```text
+capture -> extract/import candidates -> gate-candidates -> model JSON -> apply-gates -> commit --approved-only
+```
+
+模型负责语义判断，CausaMem 负责验收和写库。长期 Profile 必须满足：证据来自原文、置信度足够、不是临时状态、不会覆盖高置信旧事实。
 
 ### 4. Wiki 四层结构
 人类可读、可编辑的结构化知识库：
@@ -279,6 +320,58 @@ python gbrain.py query "架构方案"
 python gbrain.py causal "架构"
 ```
 
+### Cognitive Anchor CLI
+
+Use `anchor` before agent reasoning when the answer depends on project memory, decisions, user preferences, or causal context:
+
+```bash
+/usr/bin/python3 scripts/gbrain/gbrain.py anchor "How should this decision be made?"
+```
+
+It prints a compact context block:
+
+```text
+<causamem-cognitive-anchor>
+事实 / Rules / Decisions / Causal chains / Execution state / Constraints
+</causamem-cognitive-anchor>
+```
+
+For execution tracking, Beads can be used as an R0 reality source without replacing CausaMem:
+
+```bash
+/usr/bin/python3 scripts/gbrain/gbrain.py beads-capture /path/to/project
+```
+
+`beads-capture` reads Beads state and writes it into `raw_events`; it does not commit directly into long-term memory.
+
+CausaMem uses [Beads](https://github.com/gastownhall/beads) as an optional execution-tracking memory source. Beads is not a replacement for CausaMem; it provides task state, dependency, and audit-trail facts that CausaMem can anchor before reasoning. Thanks to the Beads project for the AI-native graph issue tracker design.
+
+Automatically attach recent pages to scenes and update stable profile facts with:
+
+```bash
+/usr/bin/python3 scripts/gbrain/gbrain.py auto-classify 80
+```
+
+`auto-classify` is intentionally conservative: it attaches pages to broad scenes and updates a few high-confidence project/agent/user profile facts. It does not delete or rewrite existing memories.
+
+For higher-quality Scene/Profile writes, OpenClaw can run a model gate after candidate extraction:
+
+```bash
+/usr/bin/python3 scripts/gbrain/gbrain.py gate-candidates 20 --json
+/usr/bin/python3 scripts/gbrain/gbrain.py apply-gates < gates.json
+/usr/bin/python3 scripts/gbrain/gbrain.py commit --approved-only
+```
+
+The model only proposes JSON decisions. CausaMem still enforces deterministic gates: source evidence must appear in the candidate text, Profile confidence must be at least `0.75`, temporary status is rejected for Profile writes, and conflicts with active high-confidence profiles are held as `conflict` instead of overwriting.
+
+Run recall regression checks with:
+
+```bash
+/usr/bin/python3 scripts/gbrain/gbrain.py eval eval/gbrain_eval.jsonl
+```
+
+The bundled eval set covers 50 project-memory questions across CausaMem, OpenClaw, Beads, cron, DingTalk, GitHub, and agent heartbeat records. It is intended as a regression guard for recall ranking, not as a synthetic benchmark.
+
 ---
 
 ## 目录结构
@@ -311,9 +404,21 @@ MHH-Causality-Memory/
 ## 技术栈
 
 - **存储**: SQLite
-- **向量搜索**: SiliconFlow Qwen3-Embedding-8B
+- **向量搜索**: Local embedding / SiliconFlow fallback
 - **AI 压缩**: MiniMax API / OpenAI Compatible
 - **格式**: Obsidian Wiki (Markdown)
+- **执行追踪**: Optional [Beads](https://github.com/gastownhall/beads) integration as R0 reality source
+
+## 安全说明
+
+不要提交 API Key、GitHub Token、本地数据库、Beads runtime 数据或任何 credential。
+
+```bash
+export SILICONFLOW_API_KEY="..."
+export MINIMAX_API_KEY="..."
+```
+
+本地运行数据默认由 `.gitignore` 排除：`*.db`、`.beads/backup/`、`.beads/embeddeddolt/`、`.beads/proxieddb/`、`*.before-sync-*`。
 
 ---
 

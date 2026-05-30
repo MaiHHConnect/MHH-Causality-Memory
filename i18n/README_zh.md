@@ -1,0 +1,150 @@
+# CausaMem - 因果记忆与认知锚定系统
+
+> 让 AI Agent 拥有跨越长期项目的一生记忆。
+> 在 Agent 判断前，先用事实、规则、历史决策、因果链和执行状态把它锚定住。
+
+[返回主 README](../README.md)
+
+## 它是什么
+
+CausaMem 不是普通向量记忆库。
+
+普通记忆系统通常是：
+
+```text
+用户提问 -> 向量搜索 -> 返回相似文本
+```
+
+CausaMem 是：
+
+```text
+捕获现实证据
+-> 提取候选记忆
+-> 大模型语义判断
+-> CausaMem 确定性门禁
+-> 写入长期因果记忆
+-> 在 Agent 判断前注入认知锚
+```
+
+它的目标不是“搜到相似内容”，而是让 Agent 在回答前先知道发生过什么、为什么发生、过去怎么决定、现在执行状态如何、哪些规则不能违背。
+
+## 三层认知锚定
+
+```text
+R0 现实证据层
+  raw_events、Beads 执行状态、真实观测
+
+C1 认知结构层
+  memory_candidates、pages、causal_edges、scenes、profiles
+
+I2 直觉注入层
+  在 OpenClaw 判断前注入 causamem-cognitive-anchor
+```
+
+## 为什么比普通记忆强
+
+普通向量记忆只看语义相似，容易出现旧日志抢排名、精确词漏召回、临时状态污染长期记忆、无法解释为什么这样判断。
+
+CausaMem 同时使用：
+
+```text
+keyword
+FTS
+vector
+lexical fallback
+causal edges
+recency
+RRF 融合排序
+MMR 去重
+因果激活
+```
+
+当前 50 条真实项目记忆回归集：
+
+```text
+hit_rate: 1.000
+MRR: 0.974
+```
+
+## OpenClaw 集成
+
+CausaMem 通过两个 hook 接入 OpenClaw：
+
+```text
+before_prompt_build
+  判断前自动召回并注入认知锚
+
+agent_end
+  自动捕获对话
+  提取候选记忆
+  调用 OpenClaw 主模型做门禁判断
+  由 CausaMem 确定性验收
+  只提交 approved 记忆
+```
+
+## Beads 边界
+
+Beads 是执行追踪现实源，不是主记忆系统。
+
+```text
+Beads 负责：任务状态、依赖、审计轨迹
+CausaMem 负责：长期因果记忆、认知锚定、判断前注入
+```
+
+## 写入门禁
+
+大模型不能直接写库。它只输出 JSON 判断：
+
+```text
+approve
+reject
+scene
+profile
+conflict
+```
+
+CausaMem 再检查：
+
+```text
+证据必须来自原文
+Profile 置信度 >= 0.75
+临时状态不能写 Profile
+冲突旧 Profile 时不覆盖
+```
+
+## 快速开始
+
+```bash
+git clone https://github.com/MaiHHConnect/MHH-Causality-Memory.git
+cd MHH-Causality-Memory
+pip install requests
+/usr/bin/python3 scripts/gbrain/gbrain.py init
+/usr/bin/python3 scripts/gbrain/gbrain.py doctor
+```
+
+生成认知锚：
+
+```bash
+/usr/bin/python3 scripts/gbrain/gbrain.py anchor "回答前应该知道什么？"
+```
+
+运行回归评测：
+
+```bash
+/usr/bin/python3 scripts/gbrain/gbrain.py eval eval/gbrain_eval.jsonl
+```
+
+## 安全说明
+
+不要提交 API Key、GitHub Token、本地数据库、Beads runtime 数据或任何 credential。
+
+使用环境变量：
+
+```bash
+export SILICONFLOW_API_KEY="..."
+export MINIMAX_API_KEY="..."
+```
+
+## 一句话
+
+CausaMem 是 Agent 的因果大脑：先看现实，再看历史，再看因果，再做判断。

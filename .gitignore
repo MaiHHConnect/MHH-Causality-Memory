@@ -1,0 +1,15 @@
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+.beads/embeddeddolt/
+.beads/backup/
+.beads/*.lock
+.beads/*.sock
+
+# Local backups
+*.before-sync-*
+*.backup.*
+*.bak.*
