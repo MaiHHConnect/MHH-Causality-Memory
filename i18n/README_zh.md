@@ -30,17 +30,17 @@ CausaMem 是：
 
 ## 8 层认知 + 直觉 + 因果记忆
 
-`R0 -> C1 -> I2` 是 CausaMem 的认知主干：
+`R0 -> C1 -> I2` 是 CausaMem 的认知主干语义；展开到实际系统，是 8 层过程：
 
 ```text
-R0 现实证据层
-  raw_events、Beads 执行状态、真实观测
-
-C1 认知结构层
-  memory_candidates、pages、causal_edges、scenes、profiles
-
-I2 直觉注入层
-  在 OpenClaw 判断前注入 causamem-cognitive-anchor
+R0 现实证据
+  -> F1 原子事实
+  -> S2 精炼摘要
+  -> P3 画像场景
+  -> K4 Wiki 知识
+  -> D5 睡梦沉淀
+  -> C6 因果链
+  -> I7 直觉注入
 ```
 
 展开到实际系统，CausaMem 是 8 层认知 + 直觉 + 因果记忆系统：
@@ -85,18 +85,7 @@ hit_rate: 1.000
 MRR: 0.974
 ```
 
-长期运行的 `ai666` OpenClaw 容器真实记忆库 2000 条召回测试：
-
-```text
-真实可评测 page: 3265
-本次抽样: 2000
-Overall hit@1: 0.5465
-Overall hit@3: 0.6215
-Overall hit@6: 0.6555
-Overall MRR:   0.5888
-```
-
-总分包含大量 R0 原始日志，因此会被审计层噪声拉低。主判断层 `refined-c1` 的表现更能代表 CausaMem 0.17 的实际使用质量：
+长期运行的 `ai666` OpenClaw 容器中，`refined-c1` 主判断层表现如下：
 
 ```text
 refined-c1 n=872
