@@ -126,7 +126,7 @@ Answer pass: 29/30
 Pass rate: 96.7%
 ```
 
-This measures answerability after refinement, not just retrieval hit rate. The single failure was an over-generalized answer: retrieval hit the correct factlet, but the model did not stick to the target execution-time fact when multiple related memories were present.
+This measures answerability after refinement, not just retrieval hit rate. The only failed case still retrieved the correct factlet, but the answer blended several related memories instead of precisely restating one time-specific fact. This is answer over-generalization, not retrieval failure.
 
 ## Controlled Memory Writes
 
