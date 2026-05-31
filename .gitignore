@@ -13,3 +13,8 @@
 *.before-sync-*
 *.backup.*
 *.bak.*
+
+# Local benchmark artifacts
+benchmarks/longmemeval/data/
+benchmarks/longmemeval/results/
+benchmarks/longmemeval/upstream/
