@@ -116,6 +116,8 @@ Conclusion: the refined C1 layer is stable for primary judgment. R0 raw logs are
 
 On the same long-running `ai666` OpenClaw container, 30 real facts were sampled from the formal `factlet-c1` refined memory layer. The test retrieves the CausaMem memory page first, then gives the full `Fact/Evidence` context to the model for answering.
 
+Underlying data scope: roughly 200k historical session lines / multi-million-character long-running interaction history, refined by LLM extraction and deterministic evidence gates into `factlet-c1`.
+
 ```text
 Source: factlet-c1
 Cases: 30
