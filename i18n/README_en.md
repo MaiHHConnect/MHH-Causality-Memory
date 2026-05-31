@@ -25,20 +25,20 @@ When an agent touches one node, CausaMem can trace what happened, why it happene
 
 ## Cognitive Anchoring
 
-CausaMem uses `R0 -> C1 -> I2` as its cognitive backbone:
+CausaMem uses `R0 -> C1 -> I2` as its cognitive backbone. Expanded into the runtime system, this becomes an 8-layer process:
 
 ```text
-R0 Reality Evidence Layer
-  Raw events, execution traces, Beads task state, observed facts
-
-C1 Cognitive Structure Layer
-  Memory candidates, pages, causal edges, scenes, profiles, decisions
-
-I2 Intuition Injection Layer
-  A compact cognitive anchor injected before the agent reasons
+R0 Reality Evidence
+  -> F1 Atomic Factlets
+  -> S2 Refined Summaries
+  -> P3 Profiles and Scenes
+  -> K4 Wiki Knowledge
+  -> D5 Dream Consolidation
+  -> C6 Causal Chains
+  -> I7 Intuition Injection
 ```
 
-The anchor contains facts, rules, historical decisions, causal chains, execution state, and judgment constraints.
+The system first preserves evidence, then refines facts, summaries, profiles, Wiki knowledge, and dream consolidation, then links causal chains and injects intuition anchors before judgment.
 
 Expanded into the actual runtime system, CausaMem is an 8-layer cognition + intuition + causal memory system:
 
@@ -84,18 +84,7 @@ MRR: 0.974
 
 This is a regression set for CausaMem's own project memory, not a public benchmark.
 
-Real long-running memory benchmark from the `ai666` OpenClaw container:
-
-```text
-real evaluable pages: 3265
-sample size: 2000
-overall hit@1: 0.5465
-overall hit@3: 0.6215
-overall hit@6: 0.6555
-overall MRR:   0.5888
-```
-
-The overall score includes noisy R0 raw session logs, so the C1 judgment layer is the primary usage signal:
+On the long-running `ai666` OpenClaw container, the `refined-c1` judgment layer performed as follows:
 
 ```text
 refined-c1 n=872
