@@ -42,6 +42,12 @@ The system first preserves evidence, then refines facts, summaries, profiles, Wi
 
 Expanded into the actual runtime system, CausaMem is an 8-layer cognition + intuition + causal memory system:
 
+Design philosophy: an LLM can be treated as something with intelligence, but an Agent does not automatically have complete cognition. Humans are similar: someone can be very capable in one domain, such as games, while still having weak real-world judgment in another. Agents have model capability, but they still need long-term cognitive structure. CausaMem fills that gap by turning long-running experience, project facts, rules, and historical decisions into judgment-ready memory.
+
+Once cognition is built, the Agent also needs something like human intuition. Human intuition often comes from the subconscious; people do not always know which past experiences their subconscious used. CausaMem treats intuition in the same way: before judgment, it embeds refined facts, risks, tendencies, and next-step suggestions into context. The Agent does not need to know exactly which part of a multi-million-character history was activated, but it is anchored by the distilled essence of that history.
+
+Finally, long-term memory cannot remain a pile of facts. It needs causal chains. CausaMem compresses conversations, execution traces, project experience, and historical decisions into durable life/project essence, then tracks why something happened, what it caused, and whether it is still valid. This moves the Agent from remembering more to judging better.
+
 - **Cognition** turns raw conversations, execution traces, and project facts into judgment-ready structure: facts, rules, scenes, profiles, and historical decisions.
 - **Intuition** compresses the most important facts, risks, and next-step tendencies into a cognitive anchor before judgment, so the agent starts from the right direction.
 - **Causality** is derived from evidence, historical decisions, task outcomes, and conflict changes to answer why something happened, what it caused, and whether it is still valid.
