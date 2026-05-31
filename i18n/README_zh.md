@@ -134,6 +134,39 @@ pip install requests
 /usr/bin/python3 scripts/gbrain/gbrain.py eval eval/gbrain_eval.jsonl
 ```
 
+## Session 记忆精炼器
+
+`scripts/gbrain/refine_sessions.py` 可以把长期运行产生的 session JSONL 离线压缩成 C1 认知结构页。
+
+它不是把每条消息逐条发给 LLM，而是在本地规则式处理：
+
+```text
+session JSONL -> 抽取有效文本 -> agent 隔离 -> topic/date 分桶 -> refined-c1 -> CausaMem
+```
+
+示例：
+
+```bash
+python3 scripts/gbrain/refine_sessions.py \
+  --agents-dir ~/.openclaw/agents \
+  --gbrain scripts/gbrain/gbrain.py \
+  --agent main \
+  --max-files 10000 \
+  --max-lines 10000
+```
+
+常用参数：
+
+| 参数 | 说明 |
+|------|------|
+| `--agents-dir` | 包含 `<agent>/sessions/*.jsonl` 的目录 |
+| `--agent` | 只精炼一个 agent；不传则扫描全部 agent |
+| `--max-files` | 每个 agent 最多读取多少 session 文件 |
+| `--max-lines` | 每个 session 文件最多读取多少行 |
+| `--dry-run` | 只统计，不写入 CausaMem |
+
+生成的页面 slug 类似 `refined-session-main-memory-system-2026-05-31-xxxx`，页面正文带 `agent_id`、`topic`、`date` 和判断约束，适合把 R0 原始对话沉淀成 C1 主判断层。
+
 ## 安全说明
 
 不要提交 API Key、GitHub Token、本地数据库、Beads runtime 数据或任何 credential。

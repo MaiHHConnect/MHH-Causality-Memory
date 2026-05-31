@@ -142,6 +142,39 @@ Run recall regression:
 /usr/bin/python3 scripts/gbrain/gbrain.py eval eval/gbrain_eval.jsonl
 ```
 
+## Session Memory Refiner
+
+`scripts/gbrain/refine_sessions.py` turns long-running session JSONL logs into compact C1 memory pages.
+
+It does not send every message to an LLM. The tool runs locally:
+
+```text
+session JSONL -> extract useful text -> isolate by agent -> bucket by topic/date -> refined-c1 -> CausaMem
+```
+
+Example:
+
+```bash
+python3 scripts/gbrain/refine_sessions.py \
+  --agents-dir ~/.openclaw/agents \
+  --gbrain scripts/gbrain/gbrain.py \
+  --agent main \
+  --max-files 10000 \
+  --max-lines 10000
+```
+
+Useful flags:
+
+| Flag | Description |
+|---|---|
+| `--agents-dir` | Directory containing `<agent>/sessions/*.jsonl` |
+| `--agent` | Refine one agent namespace only |
+| `--max-files` | Maximum session files per agent |
+| `--max-lines` | Maximum lines per session file |
+| `--dry-run` | Scan and report without writing pages |
+
+The generated pages use slugs like `refined-session-main-memory-system-2026-05-31-xxxx` and include `agent_id`, `topic`, `date`, and judgment constraints. This is the recommended first pass for turning R0 raw conversations into the C1 judgment layer.
+
 ## Security
 
 Do not commit API keys, tokens, local databases, Beads runtime data, or credentials. Use environment variables for `SILICONFLOW_API_KEY` and `MINIMAX_API_KEY`.

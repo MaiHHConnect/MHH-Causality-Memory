@@ -6,6 +6,8 @@
 
 ---
 
+> Current reference for Cognitive Anchoring and Session Memory Refiner: [English](README_en.md) / [中文](README_zh.md).
+
 ## Design Philosophy
 
 **The goal of this project: Make AI agents remember 2 million characters.**

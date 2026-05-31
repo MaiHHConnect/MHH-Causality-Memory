@@ -152,7 +152,40 @@ capture -> extract/import candidates -> gate-candidates -> model JSON -> apply-g
 
 模型负责语义判断，CausaMem 负责验收和写库。长期 Profile 必须满足：证据来自原文、置信度足够、不是临时状态、不会覆盖高置信旧事实。
 
-### 4. Wiki 四层结构
+### 6. Session 记忆精炼器
+
+`scripts/gbrain/refine_sessions.py` 可以把长期运行产生的 session JSONL 离线压缩成 C1 认知结构页。
+
+它不是把每条消息逐条发给 LLM，而是本地规则式处理：
+
+```text
+session JSONL -> 抽取有效文本 -> agent 隔离 -> topic/date 分桶 -> refined-c1 -> CausaMem
+```
+
+示例：
+
+```bash
+python3 scripts/gbrain/refine_sessions.py \
+  --agents-dir ~/.openclaw/agents \
+  --gbrain scripts/gbrain/gbrain.py \
+  --agent main \
+  --max-files 10000 \
+  --max-lines 10000
+```
+
+常用参数：
+
+| 参数 | 说明 |
+|------|------|
+| `--agents-dir` | 包含 `<agent>/sessions/*.jsonl` 的目录 |
+| `--agent` | 只精炼一个 agent；不传则扫描全部 agent |
+| `--max-files` | 每个 agent 最多读取多少 session 文件 |
+| `--max-lines` | 每个 session 文件最多读取多少行 |
+| `--dry-run` | 只统计，不写入 CausaMem |
+
+生成的页面 slug 类似 `refined-session-main-memory-system-2026-05-31-xxxx`，页面正文带 `agent_id`、`topic`、`date` 和判断约束，适合把 R0 原始对话沉淀成 C1 主判断层。
+
+### 7. Wiki 四层结构
 人类可读、可编辑的结构化知识库：
 
 ```
@@ -163,7 +196,7 @@ wiki/
 └── _dream/          # 抽象层：定期做梦输出
 ```
 
-### 5. 做梦抽象总结（Cron）
+### 8. 做梦抽象总结（Cron）
 定时任务，自动分析近期记忆，生成因果串线和抽象判断：
 
 **小整理**（每天 02:30）：过滤重要事件，追加到当天日记
@@ -183,15 +216,15 @@ wiki/
 - 下一个里程碑：让其他agent也能使用这套系统
 ```
 
-### 6. 类型标签系统
+### 9. 类型标签系统
 按类型组织记忆，方便筛选：
 
 `DECISION` | `INSIGHT` | `BUG` | `FEATURE` | `CHANGE` | `DAILY`
 
-### 7. 多 Agent 共享
+### 10. 多 Agent 共享
 记忆存储在文件系统，多个 Agent 可以同时访问、互不影响。
 
-### 8. AI 情绪模块
+### 11. AI 情绪模块
 AI 的状态也可以被记录和追踪，作为因果链中的一个节点。
 
 **功能定义表：**
