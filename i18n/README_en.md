@@ -67,6 +67,39 @@ MRR: 0.974
 
 This is a regression set for CausaMem's own project memory, not a public benchmark.
 
+Real long-running memory benchmark from the `ai666` OpenClaw container:
+
+```text
+real evaluable pages: 3265
+sample size: 2000
+overall hit@1: 0.5465
+overall hit@3: 0.6215
+overall hit@6: 0.6555
+overall MRR:   0.5888
+```
+
+The overall score includes noisy R0 raw session logs, retired Hy-Memory L0 records, and raw OpenClaw captures. The C1 judgment layer is the primary usage signal:
+
+```text
+refined-c1 n=872
+hit@1: 0.9495
+hit@3: 0.9817
+hit@6: 0.9943
+MRR:   0.9676
+```
+
+Source-level snapshot:
+
+| Source | n | hit@1 | hit@3 | hit@6 | MRR |
+|---|---:|---:|---:|---:|---:|
+| `refined-c1` | 872 | 0.9495 | 0.9817 | 0.9943 | 0.9676 |
+| `memos-local` | 217 | 0.7281 | 0.9585 | 0.9770 | 0.8445 |
+| `dream-c1` | 19 | 0.5789 | 0.7368 | 0.8947 | 0.6807 |
+| `wiki-c1` | 205 | 0.3512 | 0.5512 | 0.6829 | 0.4707 |
+| `session-file` | 518 | 0.0058 | 0.0328 | 0.0695 | 0.0255 |
+
+Conclusion: the refined C1 layer is stable for primary judgment. R0 raw logs are better treated as audit evidence, not as the main recall-quality signal.
+
 ## Controlled Memory Writes
 
 CausaMem does not let an LLM write directly into long-term memory.

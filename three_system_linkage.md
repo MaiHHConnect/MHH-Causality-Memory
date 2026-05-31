@@ -1,17 +1,43 @@
-## Three-System Linkage Rules (OpenClaw Workspace)
+## Three-System Linkage Rules (CausaMem v0.17)
 
 ```
-CausaMem (因果记忆) ←→ self-improving (执行质量) ←→ proactivity (主动行为)
-     ↓                      ↓                        ↓
-  知识触发                 教训固化                  行动驱动
-  被动唤醒                 被动写入                  主动驱动
+CausaMem 0.17（因果记忆 / 认知锚定）
+        ↓
+self-improving（执行质量 / 复盘固化）
+        ↓
+proactivity（前瞻行为 / 主动跟进）
+        ↓
+Beads（执行状态 / 审计轨迹，作为 R0 现实源回流 CausaMem）
 ```
 
 | System | Key Question | When |
 |--------|-------------|------|
-| CausaMem | "How is this related to past events?" | Task start |
-| self-improving | "What did this teach me?" | Task end |
-| proactivity | "What should I do next proactively?" | Idle/periodic |
+| CausaMem | "What facts, rules, decisions, and causal chains should anchor this judgment?" | Before judgment / task start |
+| self-improving | "What did this teach me, and what should be fixed next time?" | Task end / after failure |
+| proactivity | "What should I do next proactively?" | Idle / periodic / follow-through |
+| Beads | "What is the current execution state and audit trail?" | During execution |
 
-**Linkage:** CausaMem triggers domain → self-improving reads domain file → causal network chains lessons.
-proactivity drives action → proactively links causal memory cases as decision references.
+## Boundaries
+
+- CausaMem is the primary memory and judgment system. It owns long-term causal memory, R0/C1/I2 anchoring, and deterministic write gates.
+- self-improving does not replace memory. It stores execution lessons, corrections, domain heuristics, and quality improvements.
+- proactivity does not replace memory. It stores active follow-through state, proactive boundaries, heartbeat rules, and next-action momentum.
+- Beads does not replace CausaMem. It is an execution-tracking reality source for tasks, dependencies, ready queues, and audit traces.
+
+## Linkage
+
+```text
+CausaMem -> recalls C1/R0 context before judgment
+self-improving -> solidifies lessons after execution
+proactivity -> drives the next useful action
+Beads -> feeds execution facts back as R0 evidence
+```
+
+Short form:
+
+```text
+CausaMem = brain
+self-improving = learning muscle
+proactivity = action nerve
+Beads = execution sensor
+```

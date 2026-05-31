@@ -73,6 +73,41 @@ OpenClaw 集成后，CausaMem 会在 `before_prompt_build` 注入 `<causamem-cog
 | **确定性验收** | evidence 必须来自原文、Profile 置信度 ≥0.75、临时状态不写 Profile、冲突不覆盖 |
 | **召回回归** | 50 条真实项目记忆评测：`hit_rate=1.000`、`MRR=0.974` |
 
+### 真实记忆召回测试（ai666 / 2000 条）
+
+在长期运行的 `ai666` OpenClaw 容器中，CausaMem 使用真实记忆库做了 2000 条召回测试：
+
+```text
+真实可评测 page: 3265
+本次抽样: 2000
+Overall hit@1: 0.5465
+Overall hit@3: 0.6215
+Overall hit@6: 0.6555
+Overall MRR:   0.5888
+```
+
+总分包含大量 R0 原始日志、历史 Hy-Memory L0 和 OpenClaw 原始 capture，因此会被审计层噪声拉低。主判断层 `refined-c1` 的表现更能代表 CausaMem 0.17 的实际使用质量：
+
+```text
+refined-c1 n=872
+hit@1: 0.9495
+hit@3: 0.9817
+hit@6: 0.9943
+MRR:   0.9676
+```
+
+其他真实来源结果：
+
+| Source | n | hit@1 | hit@3 | hit@6 | MRR |
+|--------|---:|------:|------:|------:|----:|
+| `refined-c1` | 872 | 0.9495 | 0.9817 | 0.9943 | 0.9676 |
+| `memos-local` | 217 | 0.7281 | 0.9585 | 0.9770 | 0.8445 |
+| `dream-c1` | 19 | 0.5789 | 0.7368 | 0.8947 | 0.6807 |
+| `wiki-c1` | 205 | 0.3512 | 0.5512 | 0.6829 | 0.4707 |
+| `session-file` | 518 | 0.0058 | 0.0328 | 0.0695 | 0.0255 |
+
+结论：C1 精炼层已经稳定可用；R0 原始日志更适合作为审计证据，不适合作为主判断召回指标。
+
 ### 1. v0.16 重大升级：借鉴 SPlus + MemGPT
 
 **借鉴来源：** `FalconOrtiz/SPlus-Memory`（激活传播+时序衰减）+ `MemGPT/Awella`（自动压缩）
@@ -477,7 +512,28 @@ For details, see [LICENSE](LICENSE) file.
 
 ## Agent Skill 生态配套
 
-CausaMem v0.15 配套两个增强 Skill，通过 OpenClaw 的 clawhub 安装：
+CausaMem v0.17 是主记忆和主判断系统。self-improving、proactivity、Beads 是配套能力，不替代 CausaMem。
+
+```text
+CausaMem 0.17（因果记忆 / 认知锚定）
+        ↓
+self-improving（执行质量 / 复盘固化）
+        ↓
+proactivity（前瞻行为 / 主动跟进）
+        ↓
+Beads（执行状态 / 审计轨迹，作为 R0 现实源回流 CausaMem）
+```
+
+一句话边界：
+
+```text
+CausaMem = 大脑
+self-improving = 学习肌肉
+proactivity = 行动神经
+Beads = 执行状态感知器
+```
+
+CausaMem v0.17 可配套两个增强 Skill，通过 OpenClaw 的 clawhub 安装：
 
 ### [self-improving](https://github.com/clawhub/clawhub/tree/main/skills/self-improving) — 执行质量固化
 
@@ -512,18 +568,19 @@ clawhub install proactivity
 ### 三套系统并存的记忆架构
 
 ```
-CausaMem（因果记忆）←→ self-improving（执行质量）←→ proactivity（前瞻行为）
-     ↓                        ↓                        ↓
-  知识触发                    教训固化                行动驱动
-  被动唤醒                    被动写入                主动驱动
+CausaMem（因果记忆 / 认知锚定）←→ self-improving（执行质量）←→ proactivity（前瞻行为）
+        ↓                             ↓                         ↓
+  主判断与知识触发                 教训固化                   行动驱动
+  R0/C1/I2 锚定                    被动写入                   主动跟进
 ```
 
 **联动机制：**
-- CausaMem 负责"这件事和之前的因果关联"
-- self-improving 负责"这件事教会了我什么"
-- proactivity 负责"接下来应该主动做什么"
+- CausaMem 负责“这件事和之前的事实、规则、历史决策、因果链有什么关系”。
+- self-improving 负责“这件事教会了我什么，下次怎么做得更稳”。
+- proactivity 负责“接下来应该主动做什么，如何不中断任务动量”。
+- Beads 负责“当前任务状态、依赖、审计轨迹是什么”，并作为 R0 现实证据回流 CausaMem。
 
-三套系统保持独立，通过 OpenClaw 的 AGENTS.md 路由层自然串联，无需手动干预。
+四者保持边界独立，通过 OpenClaw 的 AGENTS.md 路由层自然串联。CausaMem 仍是主记忆系统；其他系统是质量、行动和执行状态的增强层。
 
 ---
 
