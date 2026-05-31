@@ -117,6 +117,8 @@ MRR:   0.9676
 
 在同一长期运行的 `ai666` OpenClaw 容器中，从正式 `factlet-c1` 精萃记忆层抽取 30 条真实事实做问答测试。测试流程为：CausaMem 召回对应记忆页，再把完整 `Fact/Evidence` 上下文交给模型回答。
 
+底层数据口径：来自约 20 万行历史 session / 约 200 万字符级长期交互数据，经 LLM 精萃和确定性 evidence gate 后进入 `factlet-c1`。
+
 ```text
 Source: factlet-c1
 Cases: 30
