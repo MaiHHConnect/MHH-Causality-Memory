@@ -18,6 +18,7 @@ from gbrain import put_page_structured
 
 MEMORY_DIR = os.environ.get("MEMORY_DIR", os.path.expanduser("~/.openclaw/workspace-main/memory"))
 WIKI_DIR = os.environ.get("WIKI_DIR", os.path.expanduser("~/Documents/Obsidian Vault/07_知识库/llm-wiki"))
+CAUSAL_ITEM_TEXT_LIMIT = 200
 
 
 def read_memory_files(dates):
@@ -122,6 +123,8 @@ def generate_dream_summary(content: str, api_key: str) -> str:
 ## 因果串线
 - 事件A → 事件B → 事件C
 
+因果串线按时间倒序排列，每条包含日期或时间线索，不要添加“最新/较早/更早”等相对标签；尽量保留全部关键链条；每条不超过 {CAUSAL_ITEM_TEXT_LIMIT} 字；条数不限；保留必要链条结构，不要强行改成 A → B。
+
 ## 对未来的暗示
 - [可操作的下一步]
 """
@@ -149,7 +152,7 @@ def generate_fallback_summary(content: str) -> str:
 详细内容见 memory/ 目录。
 
 ## 因果串线
-（需要配置 MINIMAX_API_KEY 才能生成）
+（需要配置 MINIMAX_API_KEY 才能生成；按时间倒序排列，每条带日期或时间线索，每条200字内，条数不限）
 """
 
 

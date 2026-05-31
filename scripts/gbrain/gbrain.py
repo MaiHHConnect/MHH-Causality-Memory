@@ -21,6 +21,19 @@ SILICONFLOW_KEY = os.environ.get("SILICONFLOW_API_KEY", "")
 EMBEDDING_MODEL = "local-gguf"
 EMBEDDING_DIM = 768  # local embedding model output dim
 SCHEMA_VERSION = 4
+CAUSAL_ITEM_TEXT_LIMIT = 200
+
+def _clean_causal_text(text: str) -> str:
+    """Clean LLM-produced causal text without dropping chain history."""
+    value = str(text or "").strip()
+    if not value or value == "无":
+        return value
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if lines:
+        value = "\n".join(re.sub(r"[ \t]+", " ", line) for line in lines)
+    else:
+        value = re.sub(r"\s+", " ", value)
+    return value
 
 # ── DB Init ─────────────────────────────────────────────────────────────────
 def get_db() -> sqlite3.Connection:
@@ -853,8 +866,8 @@ def _llm_compress_context(context: str, title: str) -> dict:
 
 请用JSON格式输出，包含：
 - summary: 整体摘要（50字内）
-- cause: 这些记忆的共同前因（20字内）
-- effect: 这些记忆的共同后果（20字内）
+- cause: 这些记忆的前因链条（按时间倒序排列；每条包含日期或时间线索；不要添加“最新/较早/更早”等相对标签；尽量保留全部关键链条；每条不超过{CAUSAL_ITEM_TEXT_LIMIT}字；保留必要链条结构）
+- effect: 这些记忆的后果链条（按时间倒序排列；每条包含日期或时间线索；不要添加“最新/较早/更早”等相对标签；尽量保留全部关键链条；每条不超过{CAUSAL_ITEM_TEXT_LIMIT}字；保留必要链条结构）
 - decided: 最终决定（20字内）
 - learned: 最终学到（20字内）
 
@@ -869,7 +882,10 @@ JSON："""
         text = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
         m = re.search(r'\{.*\}', text, re.DOTALL)
         if m:
-            return json.loads(m.group())
+            data = json.loads(m.group())
+            data["cause"] = _clean_causal_text(data.get("cause", ""))
+            data["effect"] = _clean_causal_text(data.get("effect", ""))
+            return data
     except Exception:
         pass
     return {"summary": context[:200], "cause": "", "effect": "", "decided": "", "learned": ""}
@@ -1056,8 +1072,8 @@ def compress_observation(raw_text: str, obs_type: str = "INSIGHT") -> dict:
 - completed: 完成了什么（已解决/实现，20字内）
 - next_steps: 下一步要做什么（待处理事项，20字内）
 - concepts: 概念标签（2-4个中文关键词数组）
-- cause: 前因——导致这个事件发生的原因（15字内，没有则写"无"）
-- effect: 后果——这个事件会导致什么后续变化（15字内，没有则写"无"）
+- cause: 前因——导致这个事件发生的原因链条（按时间倒序排列；每条包含日期或时间线索；不要添加“最新/较早/更早”等相对标签；尽量保留全部关键链条；每条不超过{CAUSAL_ITEM_TEXT_LIMIT}字；保留必要链条结构；没有则写"无"）
+- effect: 后果——这个事件会导致什么后续变化链条（按时间倒序排列；每条包含日期或时间线索；不要添加“最新/较早/更早”等相对标签；尽量保留全部关键链条；每条不超过{CAUSAL_ITEM_TEXT_LIMIT}字；保留必要链条结构；没有则写"无"）
 - emotion: 当前情绪，从以下选一个：开心|低落|饿|饱|累|精神|焦虑|专注|满足|空虚|无
 
 JSON格式：
@@ -1111,8 +1127,8 @@ JSON格式：
                 "completed": data.get("completed", ""),
                 "next_steps": data.get("next_steps", ""),
                 "concepts": data.get("concepts", []),
-                "cause": data.get("cause", ""),
-                "effect": data.get("effect", ""),
+                "cause": _clean_causal_text(data.get("cause", "")),
+                "effect": _clean_causal_text(data.get("effect", "")),
                 "emotion": data.get("emotion", "无"),
                 "summary_struct": {"type": obs_type, "raw": raw_text[:500]}
             }
