@@ -19,7 +19,7 @@ Beads（执行状态 / 审计轨迹，作为 R0 现实源回流 CausaMem）
 
 ## Boundaries
 
-- CausaMem is the primary memory and judgment system. It owns long-term causal memory, R0/C1/I2 anchoring, and deterministic write gates.
+- CausaMem is the primary memory and judgment system. It owns long-term causal memory, the R0/C1/I2 cognitive backbone, the expanded 8-layer anchoring stack, and deterministic write gates.
 - self-improving does not replace memory. It stores execution lessons, corrections, domain heuristics, and quality improvements.
 - proactivity does not replace memory. It stores active follow-through state, proactive boundaries, heartbeat rules, and next-action momentum.
 - Beads does not replace CausaMem. It is an execution-tracking reality source for tasks, dependencies, ready queues, and audit traces.
@@ -40,4 +40,19 @@ CausaMem = brain
 self-improving = learning muscle
 proactivity = action nerve
 Beads = execution sensor
+```
+
+## CausaMem 8-Layer Cognition + Intuition + Causal Memory Stack
+
+Cognition structures raw facts into judgment-ready memory. Intuition injects compressed judgment anchors before reasoning. Causality links evidence, decisions, outcomes, conflicts, and validity into traceable cause-effect chains.
+
+```text
+R0 Reality Evidence
+F1 Atomic Factlets
+S2 Refined Summaries
+P3 Profiles and Scenes
+K4 Wiki Knowledge
+D5 Dream Consolidation
+C6 Causal Chains
+I7 Intuition Injection
 ```
