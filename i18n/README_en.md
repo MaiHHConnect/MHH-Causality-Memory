@@ -25,7 +25,7 @@ When an agent touches one node, CausaMem can trace what happened, why it happene
 
 ## Cognitive Anchoring
 
-CausaMem uses a three-layer anchoring model:
+CausaMem uses `R0 -> C1 -> I2` as its cognitive backbone:
 
 ```text
 R0 Reality Evidence Layer
@@ -39,6 +39,23 @@ I2 Intuition Injection Layer
 ```
 
 The anchor contains facts, rules, historical decisions, causal chains, execution state, and judgment constraints.
+
+Expanded into the actual runtime system, CausaMem is an 8-layer cognition + intuition + causal memory system:
+
+- **Cognition** turns raw conversations, execution traces, and project facts into judgment-ready structure: facts, rules, scenes, profiles, and historical decisions.
+- **Intuition** compresses the most important facts, risks, and next-step tendencies into a cognitive anchor before judgment, so the agent starts from the right direction.
+- **Causality** is derived from evidence, historical decisions, task outcomes, and conflict changes to answer why something happened, what it caused, and whether it is still valid.
+
+| Layer | Name | Role |
+|-------|------|------|
+| R0 | Reality Evidence | Raw sessions, captures, logs, and events for audit and evidence fallback |
+| F1 | Atomic Factlets | Answerable, retrievable, evidence-backed `factlet-c1` facts extracted from source text |
+| S2 | Refined Summaries | Topic/date/agent-level C1 summaries from long conversations |
+| P3 | Profiles and Scenes | Stable preferences, people, project scenes, and long-running state |
+| K4 | Wiki Knowledge | Curated and semi-curated durable knowledge backbone |
+| D5 | Dream Consolidation | Asynchronous consolidation that turns scattered experience into higher-level memory |
+| C6 | Causal Chains | Causes, effects, conflicts, evolution, and supersession relationships |
+| I7 | Intuition Injection | Judgment-time tendencies, next-step suggestions, and cognitive anchors |
 
 ## Recall Pipeline
 
@@ -78,7 +95,7 @@ overall hit@6: 0.6555
 overall MRR:   0.5888
 ```
 
-The overall score includes noisy R0 raw session logs, retired Hy-Memory L0 records, and raw OpenClaw captures. The C1 judgment layer is the primary usage signal:
+The overall score includes noisy R0 raw session logs, so the C1 judgment layer is the primary usage signal:
 
 ```text
 refined-c1 n=872
@@ -99,6 +116,20 @@ Source-level snapshot:
 | `session-file` | 518 | 0.0058 | 0.0328 | 0.0695 | 0.0255 |
 
 Conclusion: the refined C1 layer is stable for primary judgment. R0 raw logs are better treated as audit evidence, not as the main recall-quality signal.
+
+### Refined factlet QA test (ai666 / 30 cases)
+
+On the same long-running `ai666` OpenClaw container, 30 real facts were sampled from the formal `factlet-c1` refined memory layer. The test retrieves the CausaMem memory page first, then gives the full `Fact/Evidence` context to the model for answering.
+
+```text
+Source: factlet-c1
+Cases: 30
+Retrieval hit: 30/30
+Answer pass: 29/30
+Pass rate: 96.7%
+```
+
+This measures answerability after refinement, not just retrieval hit rate. The single failure was an over-generalized answer: retrieval hit the correct factlet, but the model did not stick to the target execution-time fact when multiple related memories were present.
 
 ## Controlled Memory Writes
 
