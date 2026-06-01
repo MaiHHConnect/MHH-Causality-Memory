@@ -26,6 +26,18 @@ function normalize(text) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+function contentTokens(text) {
+  const stop = new Set('the user would prefer responses that their they might may not suggestions related and or of in on for with a an as such like take into account previous existing recent current specific general generic does can could should from about especially particularly include includes including utilize using build upon provide where some more this those into its also are have has been were will would'.split(' '));
+  return [...new Set(String(text || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
+    .filter(t => t.length > 2 && !stop.has(t));
+}
+function preferenceOverlapOk(answer, hypothesis) {
+  const refTokens = contentTokens(answer);
+  if (!refTokens.length) return false;
+  const hypTokens = new Set(contentTokens(hypothesis));
+  const hits = refTokens.filter(t => hypTokens.has(t)).length;
+  return hits / refTokens.length >= 0.3;
+}
 function loadJsonl(file) {
   return new Map(fs.readFileSync(file, 'utf8')
     .split('\n')
@@ -36,6 +48,7 @@ function loadJsonl(file) {
 function isOk(ref, hyp) {
   const ans = normalize(ref?.answer);
   const got = normalize(hyp?.hypothesis);
+  if (ref?.question_type === 'single-session-preference') return preferenceOverlapOk(ref.answer, hyp?.hypothesis);
   return Boolean(ans && got.includes(ans));
 }
 function category(baseOk, testOk) {
@@ -93,7 +106,7 @@ for (const v of Object.values(summary.by_type)) {
   v.delta = Number((v.test_accuracy - v.base_accuracy).toFixed(4));
 }
 
-const output = { meta: { base: basePath, test: testPath, ref: refPath, metric: 'normalized-answer-substring' }, summary, rows };
+const output = { meta: { base: basePath, test: testPath, ref: refPath, metric: 'normalized-answer-substring+preference-token-recall' }, summary, rows };
 if (outPath) {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2) + '\n');

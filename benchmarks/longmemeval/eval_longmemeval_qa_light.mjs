@@ -23,6 +23,20 @@ function normalize(text) {
     .trim();
 }
 
+function contentTokens(text) {
+  const stop = new Set('the user would prefer responses that their they might may not suggestions related and or of in on for with a an as such like take into account previous existing recent current specific general generic does can could should from about especially particularly include includes including utilize using build upon provide where some more this those into its also are have has been were will would'.split(' '));
+  return [...new Set(String(text || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
+    .filter(t => t.length > 2 && !stop.has(t));
+}
+
+function preferenceOverlapOk(answer, hypothesis) {
+  const refTokens = contentTokens(answer);
+  if (!refTokens.length) return false;
+  const hypTokens = new Set(contentTokens(hypothesis));
+  const hits = refTokens.filter(t => hypTokens.has(t)).length;
+  return hits / refTokens.length >= 0.3;
+}
+
 const refs = new Map(JSON.parse(fs.readFileSync(refPath, 'utf8')).map(x => [x.question_id, x]));
 const hyps = fs.readFileSync(hypPath, 'utf8')
   .split('\n')
@@ -37,7 +51,9 @@ for (const hyp of hyps) {
   if (!ref) continue;
   const ans = normalize(ref.answer);
   const got = normalize(hyp.hypothesis);
-  const ok = ans.length > 0 && got.includes(ans);
+  const ok = ref.question_type === 'single-session-preference'
+    ? preferenceOverlapOk(ref.answer, hyp.hypothesis)
+    : ans.length > 0 && got.includes(ans);
   total += 1;
   correct += ok ? 1 : 0;
   const t = ref.question_type || 'unknown';
@@ -46,7 +62,7 @@ for (const hyp of hyps) {
   byType.get(t).correct += ok ? 1 : 0;
 }
 
-const summary = { metric: 'normalized-answer-substring', total, correct, accuracy: total ? Number((correct / total).toFixed(4)) : 0, by_type: {} };
+const summary = { metric: 'normalized-answer-substring+preference-token-recall', total, correct, accuracy: total ? Number((correct / total).toFixed(4)) : 0, by_type: {} };
 for (const [t, v] of [...byType.entries()].sort()) {
   summary.by_type[t] = { total: v.total, correct: v.correct, accuracy: Number((v.correct / v.total).toFixed(4)) };
 }

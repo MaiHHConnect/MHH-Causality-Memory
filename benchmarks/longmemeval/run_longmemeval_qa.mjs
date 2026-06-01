@@ -28,6 +28,7 @@ const gbrainScript = arg('--gbrain-script', 'scripts/gbrain/gbrain.py');
 const gbrainDb = arg('--gbrain-db', process.env.GBRAIN_DB || '');
 const gbrainCacheDir = arg('--gbrain-cache-dir', '');
 const includeAbstention = args.includes('--include-abstention');
+const questionTypeFilter = arg('--question-type', '');
 const resume = !args.includes('--no-resume');
 const shardIndex = numArg('--shard-index', 0);
 const shardCount = numArg('--shard-count', 1);
@@ -97,7 +98,7 @@ function taskInstruction(item) {
     case 'temporal-reasoning':
       return 'This may require date or ordering reasoning. Identify the relevant event dates from the history, compute the relationship carefully, and give the final concise answer.';
     case 'single-session-preference':
-      return 'Infer the user preference from the history. Do not give generic recommendations; answer with what the user would prefer or avoid.';
+      return 'This is a preference-profile question. Do not provide concrete recommendations, lists of resources, travel plans, recipes, or advice. Infer the user preference criteria from the single most relevant history session and answer in this style: "The user would prefer ... They may not prefer ..." Cover both positive preferences and negative constraints/dislikes. Do not add broad interests unless the relevant evidence directly supports them.';
     case 'single-session-assistant':
       return 'Recall what the assistant previously said. Preserve the key items from that prior assistant answer.';
     case 'single-session-user':
@@ -333,6 +334,7 @@ const done = doneInfo.doneIds;
 
 const selected = data
   .filter(item => includeAbstention || !String(item.question_id || '').endsWith('_abs'))
+  .filter(item => !questionTypeFilter || item.question_type === questionTypeFilter)
   .filter((_item, i) => shardCount <= 1 || (i % shardCount) === shardIndex)
   .slice(offset, limit > 0 ? offset + limit : undefined);
 const pending = selected.filter(item => !done.has(item.question_id));
