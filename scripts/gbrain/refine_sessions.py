@@ -61,7 +61,7 @@ def day_from(text, fallback="unknown-date"):
     return match.group(1) if match else fallback
 
 
-def parse_line(line):
+def parse_line(line, source_path=None, line_no=None):
     try:
         obj = json.loads(line)
     except Exception:
@@ -84,12 +84,18 @@ def parse_line(line):
     text = clean(text)
     if not text or len(text) < 20:
         return None
-    return {
+    event = {
         "timestamp": ts,
         "day": day_from(ts + " " + text),
         "role": role,
         "text": text[:MAX_SNIPPET],
     }
+    if source_path is not None:
+        event["source_path"] = str(source_path)
+    if line_no is not None:
+        event["line_no"] = line_no
+    event["event_hash"] = hashlib.sha1(line.encode("utf-8", errors="ignore")).hexdigest()[:12]
+    return event
 
 
 def topic_of(text):
@@ -134,6 +140,10 @@ def build_body(agent, topic, day, items):
     for item in items:
         lines.append(f"- {item['timestamp'] or day} [{item['role']}] {item['text']}")
     timeline = "\n".join(lines)
+    refs = "\n".join(
+        f"- {item.get('source_path', 'unknown')}:{item.get('line_no', '?')} sha1={item.get('event_hash', 'unknown')}"
+        for item in items
+    )
     return f"""# C1 refined session summary
 
 agent_id: {agent}
@@ -148,6 +158,9 @@ This page condenses raw session JSONL conversation events into C1 memory. Use th
 ## Timeline evidence
 {timeline}
 
+## R0 refs
+{refs}
+
 ## Judgment constraints
 - This summary belongs only to agent_id={agent}.
 - Do not expose it to other agents unless the operator explicitly merges namespaces.
@@ -155,10 +168,58 @@ This page condenses raw session JSONL conversation events into C1 memory. Use th
 """
 
 
-def safe_put(gbrain, slug, body, retries):
+CAUSE_MARKERS = ("因为", "由于", "原因", "blocked", "failed", "error", "报错", "问题")
+EFFECT_MARKERS = ("所以", "导致", "结果", "完成", "决定", "修复", "发布", "next", "下一步")
+
+
+def build_structured_summary(agent, topic, day, items):
+    r0_refs = [
+        {
+            "path": item.get("source_path"),
+            "line": item.get("line_no"),
+            "hash": item.get("event_hash"),
+            "timestamp": item.get("timestamp"),
+        }
+        for item in items
+    ]
+    cause_lines = []
+    effect_lines = []
+    for item in items:
+        text = item["text"]
+        stamp = item.get("timestamp") or day
+        prefix = f"{stamp} [{agent}/{topic}]"
+        if any(marker.lower() in text.lower() for marker in CAUSE_MARKERS):
+            cause_lines.append(f"{prefix} {text}"[:200])
+        if any(marker.lower() in text.lower() for marker in EFFECT_MARKERS):
+            effect_lines.append(f"{prefix} {text}"[:200])
+    return {
+        "decided": "",
+        "learned": "\n".join(item["text"] for item in items[:5])[:1000],
+        "completed": "",
+        "next_steps": "",
+        "concepts": ["S2_REFINED_SESSION", agent, topic],
+        "cause": "\n".join(cause_lines),
+        "effect": "\n".join(effect_lines),
+        "emotion": "无",
+        "summary_struct": {
+            "type": "S2_REFINED_SESSION",
+            "agent_id": agent,
+            "topic": topic,
+            "date": day,
+            "source": "session-jsonl-refine",
+            "event_count": len(items),
+            "r0_refs": r0_refs,
+        },
+    }
+
+
+def safe_put(gbrain, slug, body, retries, structured=None, title=None):
     for attempt in range(retries):
         try:
-            gbrain.put_page(slug, body, page_type="refined-c1")
+            if structured:
+                gbrain.put_page_structured(slug, body, page_type="refined-c1", title=title, obs_type="S2_REFINED_SESSION", structured_override=structured, merge_causal=False)
+            else:
+                gbrain.put_page(slug, body, page_type="refined-c1")
             return True
         except sqlite3.OperationalError as exc:
             if "locked" not in str(exc).lower() or attempt == retries - 1:
@@ -195,7 +256,7 @@ def main():
                 for index, line in enumerate(fh):
                     if index >= args.max_lines:
                         break
-                    event = parse_line(line)
+                    event = parse_line(line, source_path=path, line_no=index + 1)
                     if not event:
                         continue
                     buckets[(agent, topic_of(event["text"]), event["day"])].append(event)
@@ -211,8 +272,10 @@ def main():
                 continue
             digest = hashlib.sha1(f"{agent}|{topic}|{day}".encode()).hexdigest()[:12]
             slug = f"refined-session-{agent}-{topic}-{day}-{digest}".replace("/", "-")
-            body = build_body(agent, topic, day, items[:args.max_items_per_bucket])
-            if safe_put(gbrain, slug, body, args.retries):
+            kept_items = items[:args.max_items_per_bucket]
+            body = build_body(agent, topic, day, kept_items)
+            structured = build_structured_summary(agent, topic, day, kept_items)
+            if safe_put(gbrain, slug, body, args.retries, structured=structured, title=f"{agent} {topic} {day}"):
                 written += 1
 
     print(f"session_files_scanned: {files_scanned}")

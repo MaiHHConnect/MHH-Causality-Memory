@@ -94,16 +94,21 @@ node benchmarks/longmemeval/run_longmemeval_qa.mjs \
 
 Useful options:
 
-- `--provider mock|openclaw-cli`
+- `--provider mock|openclaw-cli|openai-compatible`
 - `--model <provider/model>`
+- `--api-base-url <url>` for OpenAI-compatible providers; default reads `BUY_API_BASE_URL`/`OPENAI_BASE_URL` or `https://api.buy-api.com/v1`
 - `--limit N --offset N`
 - `--shard-count N --shard-index I`
+- `--session-char-limit N` truncates assistant turns in prompt context; user turns stay intact
 - `--prompt-mode generic|task-aware`
-- `--context-mode bm25|causamem|bm25+causamem`
+- `--context-mode bm25|causamem|bm25+causamem|real_causamem|bm25+real_causamem`
+- `--gbrain-cache-dir <dir>` for per-question real CausaMem DBs
 - `--include-abstention`
 - default resume is enabled; use `--no-resume` only for a fresh output file
 
 Task-aware prompting keeps the same retrieved evidence but adds instructions for LongMemEval task types such as temporal reasoning, knowledge updates, multi-session aggregation, and user preferences. Keep task-aware outputs in separate files from baseline outputs.
+
+The QA prompt places the question before long memory context. With long contexts, placing the question only at the end can cause repeated or stale answers on some OpenAI-compatible gateways.
 
 CausaMem context mode turns the retrieved sessions into a compact dated causal memory block ordered newest to oldest. It is useful for testing whether causal-style context helps state updates, temporal reasoning, and multi-session aggregation:
 
@@ -117,6 +122,46 @@ node benchmarks/longmemeval/run_longmemeval_qa.mjs \
 ```
 
 `bm25+causamem` includes both the compact causal memory block and the raw retrieved chats. `causamem` includes only the compact dated causal memory block.
+
+Real CausaMem mode uses actual `gbrain.py anchor --json` output. Prepare one isolated DB per question before running it:
+
+```bash
+/usr/bin/python3 benchmarks/longmemeval/prepare_longmemeval_gbrain.py \
+  --data benchmarks/longmemeval/results/target_30_tmk.json \
+  --out-dir benchmarks/longmemeval/results/gbrain_cache_target_30 \
+  --gbrain scripts/gbrain/gbrain.py \
+  --force
+```
+
+Then run QA with the cache directory:
+
+```bash
+node benchmarks/longmemeval/run_longmemeval_qa.mjs \
+  --data benchmarks/longmemeval/results/target_30_tmk.json \
+  --out benchmarks/longmemeval/results/target_30_bm25_real_causamem_taskaware.jsonl \
+  --topk 5 \
+  --context-mode bm25+real_causamem \
+  --gbrain-cache-dir benchmarks/longmemeval/results/gbrain_cache_target_30 \
+  --prompt-mode task-aware \
+  --no-resume
+```
+
+`real_causamem` refuses to use the default machine DB. Pass `--gbrain-cache-dir` or `--gbrain-db` explicitly to avoid cross-case contamination.
+
+For Buy-API/OpenAI-compatible runs, set the key in the environment instead of writing it into result files or commands:
+
+```bash
+export BUY_API_KEY="sk-..."
+export BUY_API_BASE_URL="https://api.buy-api.com/v1"
+node benchmarks/longmemeval/run_longmemeval_qa.mjs \
+  --data benchmarks/longmemeval/results/target_30_tmk.json \
+  --out benchmarks/longmemeval/results/target_30_bm25_gpt55.jsonl \
+  --provider openai-compatible \
+  --model gpt-5.5 \
+  --context-mode bm25 \
+  --prompt-mode task-aware \
+  --no-resume
+```
 
 ## QA Evaluation
 
@@ -151,6 +196,16 @@ node benchmarks/longmemeval/analyze_longmemeval_qa_errors.mjs \
 ```
 
 The analyzer is heuristic and dependency-free. It separates likely substring false negatives, retrieval misses, state-update errors, aggregation errors, temporal errors, preference-prompt errors, and generation errors.
+
+Compare two QA runs by question id:
+
+```bash
+node benchmarks/longmemeval/compare_longmemeval_runs.mjs \
+  --base benchmarks/longmemeval/results/target_30_bm25_gpt55.jsonl \
+  --test benchmarks/longmemeval/results/target_30_bm25_real_causamem_gpt55.jsonl \
+  --ref benchmarks/longmemeval/results/target_30_tmk.json \
+  --out benchmarks/longmemeval/results/target_30_compare_bm25_vs_bm25_real.json
+```
 
 ## Caveats
 

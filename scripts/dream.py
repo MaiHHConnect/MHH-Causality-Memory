@@ -9,6 +9,7 @@ import sys
 import os
 import json
 import glob
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -19,6 +20,54 @@ from gbrain import put_page_structured
 MEMORY_DIR = os.environ.get("MEMORY_DIR", os.path.expanduser("~/.openclaw/workspace-main/memory"))
 WIKI_DIR = os.environ.get("WIKI_DIR", os.path.expanduser("~/Documents/Obsidian Vault/07_知识库/llm-wiki"))
 CAUSAL_ITEM_TEXT_LIMIT = 200
+
+
+def extract_section_lines(markdown: str, heading: str) -> list[str]:
+    """Extract bullet lines from a markdown section."""
+    lines = []
+    in_section = False
+    for raw in markdown.splitlines():
+        line = raw.strip()
+        heading_match = re.match(r"^#{2,6}\s*(.+?)\s*[:：]?\s*$", line)
+        if heading_match:
+            in_section = heading_match.group(1).strip() == heading
+            continue
+        if in_section:
+            if not line:
+                continue
+            item_match = re.match(r"^(?:[-*]|\d+[.)、])\s*(.+)$", line)
+            if item_match:
+                item = item_match.group(1).strip()
+                if item and not item.startswith("（"):
+                    lines.append(item[:CAUSAL_ITEM_TEXT_LIMIT])
+    return lines
+
+
+def build_dream_structured(summary: str, date_str: str, dates: list[str]) -> dict:
+    causal_chains = extract_section_lines(summary, "因果串线")
+    future_hints = extract_section_lines(summary, "对未来的暗示")
+    relation_findings = extract_section_lines(summary, "关系发现")
+    stage_judgment = extract_section_lines(summary, "阶段判断")
+    return {
+        "decided": "",
+        "learned": "\n".join(relation_findings + stage_judgment)[:1000],
+        "completed": "",
+        "next_steps": "\n".join(future_hints),
+        "concepts": ["D5_DREAM", "causal-memory", "dream-consolidation"],
+        "cause": "\n".join(causal_chains),
+        "effect": "\n".join(future_hints),
+        "emotion": "无",
+        "summary_struct": {
+            "type": "D5_DREAM",
+            "date": date_str,
+            "period": "过去7天",
+            "source_dates": dates,
+            "relation_findings": relation_findings,
+            "stage_judgment": stage_judgment,
+            "causal_chains": causal_chains,
+            "future_hints": future_hints,
+        },
+    }
 
 
 def read_memory_files(dates):
@@ -99,7 +148,8 @@ created: {datetime.now().isoformat()}
     
     # 同时写入 gbrain（因果记忆）
     slug = f"dream-{date_str}"
-    put_page_structured(slug, frontmatter, page_type="dream", title=f"做梦 {date_str}", obs_type="INSIGHT")
+    structured = build_dream_structured(summary, date_str, dates)
+    put_page_structured(slug, frontmatter, page_type="dream", title=f"做梦 {date_str}", obs_type="D5_DREAM", structured_override=structured, merge_causal=False)
     print(f"[dream] 已写入 gbrain: {slug}")
 
 

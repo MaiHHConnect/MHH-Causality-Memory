@@ -6,7 +6,7 @@ gbrain_search.py — OpenClaw fallback search
 """
 import sqlite3, os, sys, struct, requests
 
-GBRAIN_DB = os.environ.get("GBRAIN_DB", os.path.join(os.path.dirname(__file__), "brain.db"))
+GBRAIN_DB = os.environ.get("GBRAIN_DB", os.path.expanduser("~/gbrain-data/brain.db"))
 SF_KEY = os.environ.get("SILICONFLOW_API_KEY", "")
 
 def get_embedding(text: str) -> list[float]:

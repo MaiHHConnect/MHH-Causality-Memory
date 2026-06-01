@@ -18,6 +18,7 @@ const refPath = arg('--ref', 'benchmarks/longmemeval/data/longmemeval_s_cleaned.
 const outPath = arg('--out', 'benchmarks/longmemeval/results/s_qa_top5_judge.jsonl');
 const model = arg('--model', 'minimax/MiniMax-M2.7-highspeed');
 const provider = arg('--provider', 'openclaw-cli');
+const apiBaseUrl = arg('--api-base-url', process.env.BUY_API_BASE_URL || process.env.OPENAI_BASE_URL || 'https://www.buy-api.com/v1');
 const limit = numArg('--limit', 0);
 const offset = numArg('--offset', 0);
 const resume = !args.includes('--no-resume');
@@ -45,13 +46,43 @@ function callOpenClaw(prompt) {
   if (!text) throw new Error(`empty model output: ${res.stdout.slice(0, 1000)}`);
   return text.trim();
 }
+function callOpenAICompatible(prompt) {
+  const key = process.env.BUY_API_KEY || process.env.OPENAI_API_KEY;
+  if (!key) throw new Error('missing BUY_API_KEY or OPENAI_API_KEY for openai-compatible provider');
+  const url = `${apiBaseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const requestId = `longmemeval-judge-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const res = spawnSync('curl', [
+    '-sS', '--fail-with-body',
+    '-X', 'POST', url,
+    '-H', `Authorization: Bearer ${key}`,
+    '-H', 'Content-Type: application/json',
+    '-H', `X-Request-ID: ${requestId}`,
+    '--data', JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
+      stream: false,
+    }),
+  ], {
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024,
+    timeout: 180000,
+  });
+  if (res.status !== 0) throw new Error(`openai-compatible exited ${res.status}: ${(res.stderr || res.stdout || '').slice(0, 1000)}`);
+  const parsed = JSON.parse(res.stdout);
+  const text = parsed?.choices?.[0]?.message?.content || parsed?.choices?.[0]?.text;
+  if (!text) throw new Error(`empty model output: ${res.stdout.slice(0, 1000)}`);
+  return String(text).trim();
+}
 function judge(ref, hypothesis) {
   if (provider === 'mock') {
     const ok = String(hypothesis || '').toLowerCase().includes(String(ref.answer || '').toLowerCase());
     return { verdict: ok ? 'correct' : 'incorrect', score: ok ? 1 : 0, reason: 'mock substring judge', raw_judge: '' };
   }
-  if (provider !== 'openclaw-cli') throw new Error(`unsupported provider: ${provider}`);
-  const raw = callOpenClaw(buildPrompt(ref, hypothesis));
+  let raw = '';
+  if (provider === 'openclaw-cli') raw = callOpenClaw(buildPrompt(ref, hypothesis));
+  else if (provider === 'openai-compatible') raw = callOpenAICompatible(buildPrompt(ref, hypothesis));
+  else throw new Error(`unsupported provider: ${provider}`);
   const parsed = parseJudge(raw);
   const verdict = String(parsed.verdict || '').toLowerCase().includes('correct') && !String(parsed.verdict || '').toLowerCase().includes('incorrect') ? 'correct' : 'incorrect';
   const score = Number(parsed.score ?? (verdict === 'correct' ? 1 : 0)) ? 1 : 0;

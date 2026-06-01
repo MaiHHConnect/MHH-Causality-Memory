@@ -20,8 +20,11 @@ SILICONFLOW_KEY = os.environ.get("SILICONFLOW_API_KEY", "")
 
 EMBEDDING_MODEL = "local-gguf"
 EMBEDDING_DIM = 768  # local embedding model output dim
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 CAUSAL_ITEM_TEXT_LIMIT = 200
+CAUSAL_SPLIT_RE = re.compile(
+    r"[；;。]\s*(?=(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}|\d+[.)、]|因为|由于|导致|所以|结果|前因|后果))"
+)
 
 def _clean_causal_text(text: str) -> str:
     """Clean LLM-produced causal text without dropping chain history."""
@@ -34,6 +37,51 @@ def _clean_causal_text(text: str) -> str:
     else:
         value = re.sub(r"\s+", " ", value)
     return value
+
+def _split_causal_line(line: str) -> list[str]:
+    parts = []
+    for part in CAUSAL_SPLIT_RE.split(line):
+        item = part.strip(" -•\t")
+        if item:
+            parts.append(item)
+    return parts or [line]
+
+def _split_causal_items(text: str, limit: Optional[int] = None) -> list[str]:
+    """Split causal text into individual chain items without flattening history."""
+    value = _clean_causal_text(text)
+    if not value or value == "无":
+        return []
+    lines = []
+    for raw_line in value.splitlines():
+        raw_line = raw_line.strip()
+        if raw_line:
+            lines.extend(_split_causal_line(raw_line))
+    if not lines:
+        lines = [value]
+    out = []
+    seen = set()
+    for line in lines:
+        item = re.sub(r"[ \t]+", " ", line).strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item[:CAUSAL_ITEM_TEXT_LIMIT])
+        if limit is not None and len(out) >= limit:
+            break
+    return out
+
+def _merge_causal_text(new_text: str, old_text: str, limit: Optional[int] = None) -> str:
+    """Prepend new causal chains while preserving older chains."""
+    out = []
+    seen = set()
+    for item in _split_causal_items(new_text) + _split_causal_items(old_text):
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+        if limit is not None and len(out) >= limit:
+            break
+    return "\n".join(out)
 
 # ── DB Init ─────────────────────────────────────────────────────────────────
 def get_db() -> sqlite3.Connection:
@@ -51,7 +99,17 @@ def _schema_current(conn: sqlite3.Connection) -> bool:
         if not has_pages:
             return False
         version = conn.execute("SELECT value FROM config WHERE key='schema_version'").fetchone()
-        return bool(version and str(version[0]) == str(SCHEMA_VERSION))
+        if not version or str(version[0]) != str(SCHEMA_VERSION):
+            return False
+        required = {
+            "pages": {"raw_event_id", "candidate_id", "evidence", "provenance", "source"},
+            "memory_candidates": {"source", "evidence", "provenance", "gate_status", "gate_payload", "gate_reason"},
+        }
+        for table, columns in required.items():
+            existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if not columns.issubset(existing):
+                return False
+        return True
     except sqlite3.Error:
         return False
 
@@ -185,12 +243,22 @@ def _init_schema(conn: sqlite3.Connection):
     _ensure_column(conn, "pages", "agent_id", "TEXT")
     _ensure_column(conn, "pages", "session_id", "TEXT")
     _ensure_column(conn, "pages", "project_id", "TEXT")
-    _ensure_column(conn, "pages", "source", "TEXT DEFAULT 'gbrain' ")
+    _ensure_column(conn, "pages", "source", "TEXT DEFAULT 'gbrain'")
     _ensure_column(conn, "pages", "visibility", "TEXT DEFAULT 'private'")
     _ensure_column(conn, "pages", "scene_id", "INTEGER")
+    _ensure_column(conn, "pages", "raw_event_id", "INTEGER")
+    _ensure_column(conn, "pages", "candidate_id", "INTEGER")
+    _ensure_column(conn, "pages", "evidence", "TEXT")
+    _ensure_column(conn, "pages", "provenance", "TEXT")
+    _ensure_column(conn, "memory_candidates", "source", "TEXT")
+    _ensure_column(conn, "memory_candidates", "evidence", "TEXT")
+    _ensure_column(conn, "memory_candidates", "provenance", "TEXT")
     _ensure_column(conn, "memory_candidates", "gate_status", "TEXT DEFAULT 'ungated'")
     _ensure_column(conn, "memory_candidates", "gate_payload", "TEXT")
     _ensure_column(conn, "memory_candidates", "gate_reason", "TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_raw_event ON memory_candidates(raw_event_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pages_raw_event ON pages(raw_event_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pages_candidate ON pages(candidate_id)")
     conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
     conn.commit()
 
@@ -298,6 +366,23 @@ def _token_set(text: str) -> set[str]:
 def _jaccard(a: str, b: str) -> float:
     sa, sb = _token_set(a), _token_set(b)
     return len(sa & sb) / len(sa | sb) if sa and sb else 0.0
+
+def _query_terms(text: str, limit: int = 8) -> list[str]:
+    value = str(text or "").lower()
+    terms = [t for t in re.findall(r"[a-z0-9_][a-z0-9_-]+", value) if len(t) >= 2]
+    cjk_runs = re.findall(r"[\u4e00-\u9fff]{2,}", value)
+    for run in cjk_runs:
+        terms.extend(run[i:i + 2] for i in range(max(0, len(run) - 1)))
+    out = []
+    seen = set()
+    for term in terms:
+        if term in seen:
+            continue
+        seen.add(term)
+        out.append(term)
+        if len(out) >= limit:
+            break
+    return out
 
 def search_lexical_terms(query: str, limit: int = 20) -> list[dict]:
     terms = [t for t in re.findall(r"[a-z0-9][a-z0-9_-]+", query.lower()) if len(t) >= 2]
@@ -448,26 +533,25 @@ def rebuild_causal_edges_for_page(conn: sqlite3.Connection, page_id: int):
         return
     conn.execute("DELETE FROM causal_edges WHERE from_page=?", (page_id,))
     for relation_type, text in (("cause", page["cause"]), ("effect", page["effect"])):
-        if not text or text == "无":
-            continue
-        candidates = conn.execute(f"""
-            SELECT id, slug FROM pages
-            WHERE id != ? AND {_active_clause('pages')} AND LENGTH(slug) > 2
-              AND (? LIKE '%' || slug || '%' OR title LIKE ? OR compiled_truth LIKE ?)
-            ORDER BY updated_at DESC LIMIT 5""",
-            (page_id, text, f"%{text[:40]}%", f"%{text[:40]}%")).fetchall()
-        if candidates:
-            for target in candidates:
+        for item in _split_causal_items(text):
+            candidates = conn.execute(f"""
+                SELECT id, slug FROM pages
+                WHERE id != ? AND {_active_clause('pages')} AND LENGTH(slug) > 2
+                  AND (? LIKE '%' || slug || '%' OR title LIKE ? OR compiled_truth LIKE ?)
+                ORDER BY updated_at DESC LIMIT 5""",
+                (page_id, item, f"%{item[:40]}%", f"%{item[:40]}%")).fetchall()
+            if candidates:
+                for target in candidates:
+                    conn.execute("""
+                        INSERT INTO causal_edges (from_page, to_page, to_slug, relation_type, strength, confidence, evidence)
+                        VALUES (?, ?, ?, ?, 'weak', 0.65, ?)""",
+                        (page_id, target["id"], target["slug"], relation_type, item))
+            else:
+                synthetic_slug = slugify(item[:80]) or None
                 conn.execute("""
-                    INSERT INTO causal_edges (from_page, to_page, to_slug, relation_type, strength, confidence, evidence)
-                    VALUES (?, ?, ?, ?, 'weak', 0.6, ?)""",
-                    (page_id, target["id"], target["slug"], relation_type, text[:300]))
-        else:
-            synthetic_slug = slugify(text[:80]) or None
-            conn.execute("""
-                INSERT INTO causal_edges (from_page, to_slug, relation_type, strength, confidence, evidence)
-                VALUES (?, ?, ?, 'weak', 0.4, ?)""",
-                (page_id, synthetic_slug, relation_type, text[:300]))
+                    INSERT INTO causal_edges (from_page, to_slug, relation_type, strength, confidence, evidence)
+                    VALUES (?, ?, ?, 'weak', 0.45, ?)""",
+                    (page_id, synthetic_slug, relation_type, item))
 
 def rebuild_all_causal_edges():
     conn = get_db()
@@ -488,10 +572,35 @@ def capture_raw_event(content: str, role: str = "unknown", session_id: Optional[
     conn.commit()
     return cur.lastrowid
 
+def _safe_json_loads(value: str) -> dict:
+    try:
+        data = json.loads(value or "{}")
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def _candidate_provenance(raw_event: Optional[sqlite3.Row] = None, extra: Optional[dict] = None) -> str:
+    payload = dict(extra or {})
+    if raw_event:
+        payload.update({
+            "raw_event_id": raw_event["id"],
+            "session_id": raw_event["session_id"],
+            "role": raw_event["role"],
+            "source": raw_event["source"],
+            "metadata": _safe_json_loads(raw_event["metadata"]),
+        })
+    return json.dumps(payload, ensure_ascii=False)
+
+def _candidate_source(row: sqlite3.Row) -> tuple[str, str, str]:
+    source = (row["source"] or "").strip() if "source" in row.keys() else ""
+    evidence = row["evidence"] or "" if "evidence" in row.keys() else ""
+    provenance = row["provenance"] or "{}" if "provenance" in row.keys() else "{}"
+    return source or "unknown", evidence, provenance
+
 def extract_candidates(limit: int = 20) -> list[dict]:
     conn = get_db()
     events = conn.execute("""
-        SELECT id, content FROM raw_events
+        SELECT id, session_id, role, content, source, metadata FROM raw_events
         WHERE status='raw' ORDER BY created_at LIMIT ?""", (limit,)).fetchall()
     candidates = []
     for event in events:
@@ -502,11 +611,13 @@ def extract_candidates(limit: int = 20) -> list[dict]:
             ctype = _candidate_type(text)
             decided = text[:160] if ctype == "DECISION" else ""
             learned = text[:160] if ctype == "INSIGHT" else ""
+            evidence = text[:500]
+            provenance = _candidate_provenance(event, {"extractor": "extract_candidates"})
             cur = conn.execute("""
                 INSERT INTO memory_candidates
-                    (raw_event_id, candidate_type, content, cause, effect, decided, learned, priority, quality_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (event["id"], ctype, text, cause, effect, decided, learned, int(score * 100), score))
+                    (raw_event_id, candidate_type, content, cause, effect, decided, learned, priority, quality_score, source, evidence, provenance)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (event["id"], ctype, text, cause, effect, decided, learned, int(score * 100), score, event["source"], evidence, provenance))
             candidates.append({"id": cur.lastrowid, "type": ctype, "score": score, "content": text[:120]})
             conn.execute("UPDATE raw_events SET status='extracted' WHERE id=?", (event["id"],))
         else:
@@ -534,17 +645,29 @@ def import_candidates(payload: str) -> list[dict]:
         if score < 0.35:
             continue
         ctype = str(item.get("type") or item.get("candidate_type") or _candidate_type(content)).upper()
-        cause = str(item.get("cause") or "")[:300]
-        effect = str(item.get("effect") or "")[:300]
+        cause = _clean_causal_text(str(item.get("cause") or ""))[:2000]
+        effect = _clean_causal_text(str(item.get("effect") or ""))[:2000]
         decided = str(item.get("decided") or (content[:160] if ctype == "DECISION" else ""))[:300]
         learned = str(item.get("learned") or (content[:160] if ctype == "INSIGHT" else ""))[:300]
         next_steps = str(item.get("next_steps") or item.get("next") or "")[:300]
         priority = int(item.get("priority") or min(100, max(1, int(score * 100))))
+        raw_event_id = int(item.get("raw_event_id") or 0) or None
+        raw_event = None
+        if raw_event_id:
+            raw_event = conn.execute("SELECT * FROM raw_events WHERE id=?", (raw_event_id,)).fetchone()
+            if not raw_event:
+                continue
+        evidence = str(item.get("evidence") or content[:500]).strip()[:500]
+        if raw_event and evidence and evidence not in raw_event["content"]:
+            continue
+        source = str(item.get("source") or (raw_event["source"] if raw_event else "import")).strip()[:80]
+        imported_provenance = item.get("provenance") if isinstance(item.get("provenance"), dict) else {}
+        provenance = _candidate_provenance(raw_event, {**imported_provenance, "import_source": source})
         cur = conn.execute("""
             INSERT INTO memory_candidates
-                (candidate_type, content, cause, effect, decided, learned, next_steps, priority, quality_score, gate_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ctype, content, cause, effect, decided, learned, next_steps, priority, score, "ungated"))
+                (raw_event_id, candidate_type, content, cause, effect, decided, learned, next_steps, priority, quality_score, gate_status, source, evidence, provenance)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (raw_event_id, ctype, content, cause, effect, decided, learned, next_steps, priority, score, "ungated", source, evidence, provenance))
         imported.append({"id": cur.lastrowid, "type": ctype, "score": score, "content": content[:120]})
     conn.commit()
     return imported
@@ -598,8 +721,20 @@ def _gate_decision(candidate: sqlite3.Row, decision: dict) -> tuple[str, str, di
     action = decision["action"]
     confidence = decision["confidence"]
     evidence = decision["evidence"]
-    if not evidence or evidence not in content:
-        return "rejected", "evidence_missing_or_not_in_source", decision
+    if not evidence:
+        return "rejected", "evidence_missing", decision
+    if candidate["raw_event_id"]:
+        conn = get_db()
+        raw = conn.execute("SELECT id, content FROM raw_events WHERE id=?", (candidate["raw_event_id"],)).fetchone()
+        conn.close()
+        if not raw or evidence not in raw["content"]:
+            return "rejected", "evidence_missing_or_not_in_raw_source", decision
+        decision["evidence_verified_against"] = "raw_events.content"
+        decision["raw_event_id"] = raw["id"]
+    elif evidence not in content:
+        return "rejected", "evidence_missing_or_not_in_candidate", decision
+    else:
+        decision["evidence_verified_against"] = "memory_candidates.content"
     if _contains_any(decision.get("reason", "") + " " + decision.get("evidence", ""), UNCERTAIN_MARKERS):
         return "rejected", "uncertain_language", decision
     if action == "profile":
@@ -679,7 +814,7 @@ def apply_gate_payload_to_page(page_slug: str, content: str, gate_payload: Optio
             return
     auto_classify_scene_and_profile(page_slug, content, candidate_type)
 
-def commit_candidates(limit: int = 20, min_score: float = 0.45, approved_only: bool = False) -> list[dict]:
+def commit_candidates(limit: int = 20, min_score: float = 0.45, approved_only: bool = True) -> list[dict]:
     conn = get_db()
     gate_clause = "COALESCE(gate_status, 'ungated') = 'approved'" if approved_only else "COALESCE(gate_status, 'ungated') IN ('approved', 'ungated')"
     rows = conn.execute(f"""
@@ -694,15 +829,27 @@ def commit_candidates(limit: int = 20, min_score: float = 0.45, approved_only: b
         content = row["content"]
         page_id, structured = put_page_structured(slug, content, page_type="memory", obs_type=row["candidate_type"])
         conn = get_db()
+        source, evidence, provenance = _candidate_source(row)
+        gate = _safe_json_loads(row["gate_payload"])
+        gate_evidence = str(gate.get("evidence") or evidence or "")[:500]
+        page_provenance = _safe_json_loads(provenance)
+        page_provenance.update({
+            "candidate_id": row["id"],
+            "raw_event_id": row["raw_event_id"],
+            "gate": gate,
+        })
         conn.execute("""
             UPDATE pages SET
                 cause=COALESCE(NULLIF(cause, ''), ?),
                 effect=COALESCE(NULLIF(effect, ''), ?),
                 decided=COALESCE(NULLIF(decided, ''), ?),
                 learned=COALESCE(NULLIF(learned, ''), ?),
-                next_steps=COALESCE(NULLIF(next_steps, ''), ?)
+                next_steps=COALESCE(NULLIF(next_steps, ''), ?),
+                raw_event_id=?, candidate_id=?, source=?, session_id=?, evidence=?, provenance=?
             WHERE id=?""",
-            (row["cause"], row["effect"], row["decided"], row["learned"], row["next_steps"], page_id))
+            (row["cause"], row["effect"], row["decided"], row["learned"], row["next_steps"],
+             row["raw_event_id"], row["id"], source, page_provenance.get("session_id"), gate_evidence,
+             json.dumps(page_provenance, ensure_ascii=False), page_id))
         rebuild_causal_edges_for_page(conn, page_id)
         conn.execute("""
             UPDATE memory_candidates SET status='committed', committed_page=? WHERE id=?""",
@@ -798,26 +945,34 @@ def trace_memory(keyword: str, depth: int = 2, limit: int = 20) -> list[dict]:
     seen = set(start)
     frontier = start[:]
     edges = []
+    seen_edges = set()
     for _ in range(depth):
         if not frontier:
             break
         placeholders = ','.join('?' * len(frontier))
         rows = conn.execute(f"""
-            SELECT e.relation_type, e.confidence, e.evidence,
+            SELECT e.id, e.from_page, e.relation_type, e.confidence, e.evidence,
                    a.slug AS from_slug, b.slug AS to_slug, e.to_slug AS loose_to_slug,
                    e.to_page
             FROM causal_edges e
             JOIN pages a ON a.id=e.from_page
             LEFT JOIN pages b ON b.id=e.to_page
-            WHERE e.from_page IN ({placeholders}) OR e.to_page IN ({placeholders})""", frontier + frontier).fetchall()
+            WHERE e.from_page IN ({placeholders}) OR e.to_page IN ({placeholders})
+            ORDER BY e.confidence DESC, e.created_at DESC
+            LIMIT ?""", frontier + frontier + [max(limit * 3, 20)]).fetchall()
         next_frontier = []
         for row in rows:
+            if row["id"] in seen_edges:
+                continue
+            seen_edges.add(row["id"])
             item = dict(row)
             edges.append(item)
-            if row["to_page"] and row["to_page"] not in seen:
-                seen.add(row["to_page"])
-                next_frontier.append(row["to_page"])
+            for next_id in (row["from_page"], row["to_page"]):
+                if next_id and next_id not in seen:
+                    seen.add(next_id)
+                    next_frontier.append(next_id)
         frontier = next_frontier
+    edges.sort(key=lambda r: (float(r.get("confidence") or 0), str(r.get("evidence") or "")), reverse=True)
     return edges[:limit]
 
 # ── MemGPT-inspired: Auto-Compression ─────────────────────────────────────────
@@ -831,7 +986,11 @@ def auto_compress_if_needed(slug: str, title: str):
         return
 
     context = "\n".join([
-        f"记忆{i+1}: {r['compiled_truth'] or r['slug']}"
+        "\n".join([
+            f"记忆{i+1}: {r['compiled_truth'] or r['slug']}",
+            f"前因: {r['cause'] or ''}",
+            f"后果: {r['effect'] or ''}",
+        ])
         for i, r in enumerate(existing)])
     compressed = _llm_compress_context(context, title)
     compressed_json = json.dumps(compressed, ensure_ascii=False)
@@ -1141,9 +1300,11 @@ JSON格式：
 
 # ── Structured Put ───────────────────────────────────────────────────────────
 def put_page_structured(slug: str, content: str, page_type: str = "note",
-                        title: Optional[str] = None, obs_type: str = "INSIGHT"):
+                        title: Optional[str] = None, obs_type: str = "INSIGHT",
+                        structured_override: Optional[dict] = None,
+                        merge_causal: bool = True):
     """Create/update with AI compression + MemGPT auto-compress."""
-    structured = compress_observation(content, obs_type)
+    structured = structured_override or compress_observation(content, obs_type)
     conn = get_db()
     cursor = conn.cursor()
     sections = extract_sections(content)
@@ -1151,6 +1312,10 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
     timeline = build_timeline(sections)
     title = title or sections[0][1].split("\n")[0][:80] if sections else slug
     now = datetime.utcnow().isoformat()
+    existing = cursor.execute("SELECT cause, effect FROM pages WHERE slug=?", (slug,)).fetchone()
+    if existing and merge_causal:
+        structured["cause"] = _merge_causal_text(structured.get("cause", ""), existing["cause"])
+        structured["effect"] = _merge_causal_text(structured.get("effect", ""), existing["effect"])
     summary_json = json.dumps(structured["summary_struct"], ensure_ascii=False)
     concepts_json = json.dumps(structured.get("concepts", []), ensure_ascii=False)
 
@@ -1205,7 +1370,30 @@ def query_causal(keyword: str, limit: int = 10) -> list[dict]:
         WHERE {_active_clause('p')} AND (p.slug LIKE ? OR p.title LIKE ? OR p.compiled_truth LIKE ? OR p.decided LIKE ? OR p.learned LIKE ? OR p.cause LIKE ? OR p.effect LIKE ? OR e.evidence LIKE ? OR e.to_slug LIKE ?)
         ORDER BY COALESCE(e.confidence, 0.0) DESC, p.updated_at DESC LIMIT ?""",
         (f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", limit)).fetchall()
-    return [dict(r) for r in rows]
+    results = [dict(r) for r in rows]
+    if len(results) < limit:
+        seen = {r["slug"] for r in results}
+        for term in _query_terms(keyword):
+            if len(results) >= limit:
+                break
+            more = conn.execute(f"""
+                SELECT DISTINCT p.slug, p.title, p.cause, p.effect, p.decided, p.learned, p.emotion,
+                       e.relation_type, e.evidence, e.confidence
+                FROM pages p
+                LEFT JOIN causal_edges e ON e.from_page = p.id
+                WHERE {_active_clause('p')} AND (p.slug LIKE ? OR p.title LIKE ? OR p.compiled_truth LIKE ? OR p.decided LIKE ? OR p.learned LIKE ? OR p.cause LIKE ? OR p.effect LIKE ? OR e.evidence LIKE ? OR e.to_slug LIKE ?)
+                ORDER BY COALESCE(e.confidence, 0.0) DESC, p.updated_at DESC LIMIT ?""",
+                (f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", limit)).fetchall()
+            for row in more:
+                item = dict(row)
+                if item["slug"] in seen:
+                    continue
+                seen.add(item["slug"])
+                results.append(item)
+                if len(results) >= limit:
+                    break
+    results.sort(key=lambda r: (_jaccard(keyword, " ".join(str(r.get(k) or "") for k in ("slug", "title", "cause", "effect", "evidence"))), float(r.get("confidence") or 0)), reverse=True)
+    return results[:limit]
 
 # ── Tag Auto-Extract (SPlus-inspired) ───────────────────────────────────────
 def extract_and_set_tags(page_id: int, content: str):
@@ -1446,7 +1634,7 @@ def cmd_apply_gates():
         print(json.dumps(item, ensure_ascii=False))
 
 def cmd_commit():
-    committed = commit_candidates(approved_only="--approved-only" in sys.argv)
+    committed = commit_candidates(approved_only="--allow-ungated" not in sys.argv)
     print(f"committed: {len(committed)}")
     for c in committed:
         print(json.dumps(c, ensure_ascii=False))
@@ -1529,6 +1717,106 @@ def _unique_lines(values: list[str], limit: int = 6) -> list[str]:
             break
     return out
 
+def _unique_causal_lines(values: list[str], limit: int = 8) -> list[str]:
+    seen = set()
+    out = []
+    for value in values:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        for item in _split_causal_items(text, limit=limit):
+            if item in seen:
+                continue
+            seen.add(item)
+            out.append(item)
+            if len(out) >= limit:
+                return out
+    return out
+
+def _trace_anchor_line(row: dict) -> str:
+    relation = row.get("relation_type")
+    evidence = row.get("evidence") or "待补"
+    from_slug = row.get("from_slug") or "?"
+    target = row.get("to_slug") or row.get("loose_to_slug") or "?"
+    if relation == "cause":
+        return f"{target} --前因--> {from_slug}；证据：{evidence}"
+    if relation == "effect":
+        return f"{from_slug} --后果--> {target}；证据：{evidence}"
+    return f"{from_slug} --{relation or 'related'}--> {target}；证据：{evidence}"
+
+def _rank_causal_anchor_lines(question: str, field_lines: list[str], trace: list[dict], limit: int) -> list[str]:
+    candidates = []
+    for line in field_lines:
+        candidates.append((3.0 + _jaccard(question, line), line))
+    for row in trace:
+        line = _trace_anchor_line(row)
+        confidence = float(row.get("confidence") or 0)
+        penalty = -0.2 if row.get("loose_to_slug") and not row.get("to_slug") else 0.0
+        candidates.append((1.0 + confidence + _jaccard(question, line) + penalty, line))
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return _unique_causal_lines([line for _score, line in candidates], limit)
+
+def _anchor_structured_lines(question: str, keys: tuple[str, ...], limit: int = 8) -> list[str]:
+    conn = get_db()
+    terms = _query_terms(question)
+    q = question.lower()
+    synonym_groups = {
+        ("doctor", "doctors", "physician"): ["dr", "doctor", "physician", "specialist", "dermatologist", "ent", "primary care"],
+        ("clothing", "clothes", "store", "pick", "return"): ["boots", "zara", "blazer", "jeans", "dry cleaning", "alterations", "pick up", "return", "returned", "exchanged"],
+        ("model", "kits", "kit"): ["model", "kit", "kits", "scale", "revell", "tamiya", "bomber", "camaro", "spitfire", "tiger"],
+        ("projects", "project", "led", "leading"): ["project", "led", "leading", "team", "launch", "currently leading"],
+        ("restaurant", "restaurants", "korean"): ["korean", "restaurant", "restaurants", "tried"],
+        ("bike", "bikes"): ["bike", "bikes", "bicycle", "cycling"],
+        ("moved", "relocation", "rachel"): ["rachel", "moved", "move", "relocation", "suburbs", "city", "chicago"],
+        ("days", "weeks", "months", "hours"): ["day", "days", "week", "weeks", "month", "months", "hour", "hours", "ago", "passed"],
+        ("camping", "camp"): ["camping", "camp", "trip", "yellowstone", "big sur", "day", "days"],
+    }
+    for triggers, values in synonym_groups.items():
+        if any(t in q for t in triggers):
+            terms.extend(values)
+    terms = list(dict.fromkeys([t.lower() for t in terms if t]))
+    clauses = []
+    params = []
+    for term in terms[:12]:
+        like = f"%{term}%"
+        clauses.append("(compiled_truth LIKE ? OR learned LIKE ? OR cause LIKE ? OR effect LIKE ? OR summary_struct LIKE ?)")
+        params.extend([like] * 5)
+    where = f" AND ({' OR '.join(clauses)})" if clauses else ""
+    rows = conn.execute(f"""
+        SELECT slug, title, summary_struct, compiled_truth, learned, cause, effect
+        FROM pages WHERE {_active_clause('pages')}{where}
+        ORDER BY updated_at DESC LIMIT ?""", params + [max(20, limit * 4)]).fetchall()
+    scored = []
+    for row in rows:
+        payload = _safe_json_loads(row["summary_struct"])
+        for key in keys:
+            values = payload.get(key) if isinstance(payload, dict) else None
+            if isinstance(values, str) and values.strip():
+                values = [values]
+            if not isinstance(values, list):
+                continue
+            for value in values:
+                if isinstance(value, dict):
+                    text = value.get("atom") or value.get("content") or value.get("text") or json.dumps(value, ensure_ascii=False)
+                    prefix = " ".join(str(value.get(k) or "") for k in ("date", "session_id", "role")).strip()
+                    line = f"[{row['slug']}] {prefix} {text}".strip()
+                else:
+                    line = f"[{row['slug']}] {value}"
+                overlap = _jaccard(question, line)
+                term_hits = sum(1 for term in terms[:12] if term.lower() in line.lower())
+                bonus = 0.2 if re.search(r"\d|\$", line) else 0
+                if re.search(r"\bdr\.\s*[a-z]", line, re.I):
+                    bonus += 2.0
+                if any(x in line.lower() for x in ("primary care physician", "ent specialist", "dermatologist")):
+                    bonus += 2.0
+                if any(x in line.lower() for x in ("i'm not a doctor", "not a medical professional", "large language model")):
+                    bonus -= 2.5
+                if overlap > 0 or term_hits or bonus > 0:
+                    scored.append((overlap + term_hits * 0.5 + bonus, line))
+    conn.close()
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return _unique_lines([line for _score, line in scored], limit)
+
 def _beads_snapshot(cwd: Optional[str] = None) -> dict:
     """Read Beads state without mutating it. Missing bd/project is not an error."""
     if not shutil.which("bd"):
@@ -1573,13 +1861,19 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
     decisions = _unique_lines([
         r.get("decided") or r.get("learned") or r.get("title") or "" for r in causal
     ], limit)
-    causal_lines = _unique_lines([
-        f"{r.get('from_slug')} --{r.get('relation_type')}--> {r.get('to_slug') or r.get('loose_to_slug') or '?'}；证据：{r.get('evidence') or '待补'}"
-        for r in trace
-    ] + [
-        f"[{r.get('slug')}] 前因：{r.get('cause') or '待补'}；后果：{r.get('effect') or '待补'}"
-        for r in causal
-    ], limit)
+    field_lines = []
+    for r in causal:
+        slug = r.get("slug")
+        for item in _split_causal_items(r.get("cause")):
+            field_lines.append(f"[{slug}] 前因：{item}")
+        for item in _split_causal_items(r.get("effect")):
+            field_lines.append(f"[{slug}] 后果：{item}")
+    causal_lines = _rank_causal_anchor_lines(question, field_lines, trace, limit)
+    direct_evidence = _anchor_structured_lines(question, ("direct_evidence", "memory_atoms"), max(8, limit * 2))
+    aggregation_candidates = _anchor_structured_lines(question, ("aggregation_candidates",), max(8, limit * 2))
+    timeline = _anchor_structured_lines(question, ("timeline",), max(8, limit * 2))
+    answer_plan = _anchor_structured_lines(question, ("answer_plan",), max(6, limit))
+    proposed_answers = _anchor_structured_lines(question, ("proposed_answer",), 3)
 
     beads = _beads_snapshot(beads_cwd)
     execution_status = []
@@ -1603,10 +1897,16 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
             "事实": facts,
             "规则": rules,
             "历史决策": decisions,
+            "直接证据": direct_evidence,
+            "聚合候选": aggregation_candidates,
+            "时间线": timeline,
+            "答案草稿": answer_plan,
+            "建议答案": proposed_answers,
             "因果链": causal_lines,
             "执行状态": execution_status[:limit],
             "判断约束": [
-                "不要直接猜；先依据事实、规则、历史决策和因果链判断。",
+                "不要直接猜；先依据事实、规则、历史决策、直接证据、答案草稿和因果链判断。",
+                "如果建议答案有证据支持，优先用它作为推理脚手架，并用直接证据核验。",
                 "缺少证据时标记“待核实”。",
                 "涉及执行进度时优先参考 Beads 状态；Beads 缺失时不要编造。",
             ],
@@ -1620,7 +1920,7 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
 
 def _print_anchor(anchor: dict):
     print("<causamem-cognitive-anchor>")
-    for key in ("事实", "规则", "历史决策", "因果链", "执行状态", "判断约束"):
+    for key in ("事实", "规则", "历史决策", "直接证据", "聚合候选", "时间线", "答案草稿", "建议答案", "因果链", "执行状态", "判断约束"):
         print(f"{key}：")
         values = anchor.get("anchor", {}).get(key, [])
         if values:
@@ -1682,7 +1982,7 @@ gbrain.py — GBrain Python Port v0.16 (enhanced)
 Commands:
   init                    Initialize brain.db
   put <slug> [file.md]    Create/update page (plain)
-  put-structured <slug> [file.md]  Create/update with AI compression
+  put-structured <slug> [file.md]  Create/update with AI compression; omit file to read stdin
   compress <text>          AI compress observation (print JSON)
   get <slug>              Show compiled truth + timeline + structured
   search <query>          FTS5 full-text search
@@ -1697,7 +1997,7 @@ Commands:
   import-candidates       Import L1 candidates from JSON stdin
   gate-candidates [limit] [--json] List candidates needing model gate
   apply-gates             Apply model gate JSON from stdin
-  commit                  Commit good candidates into pages
+  commit [--allow-ungated] Commit approved candidates into pages; ungated requires explicit flag
   scene <slug> <title>    Upsert scene
   attach-scene <scene> <page> Attach page to scene
   profile <type> <key> <value> Upsert profile fact

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gbrain stats"""
 import sqlite3, json, os
-GBRAIN_DB = os.environ.get("GBRAIN_DB", os.path.join(os.path.dirname(__file__), "brain.db"))
+GBRAIN_DB = os.environ.get("GBRAIN_DB", os.path.expanduser("~/gbrain-data/brain.db"))
 conn = sqlite3.connect(GBRAIN_DB)
 conn.row_factory = sqlite3.Row
 pages = conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0]

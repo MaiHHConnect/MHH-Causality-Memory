@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gbrain init"""
 import sqlite3, os
-GBRAIN_DB = os.environ.get("GBRAIN_DB", os.path.join(os.path.dirname(__file__), "brain.db"))
+GBRAIN_DB = os.environ.get("GBRAIN_DB", os.path.expanduser("~/gbrain-data/brain.db"))
 os.makedirs(os.path.dirname(GBRAIN_DB), exist_ok=True)
 conn = sqlite3.connect(GBRAIN_DB)
 conn.executescript("""

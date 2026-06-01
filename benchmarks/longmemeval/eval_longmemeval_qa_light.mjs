@@ -11,8 +11,13 @@ const hypPath = arg('--hyp', 'benchmarks/longmemeval/results/s_qa_top5.jsonl');
 const refPath = arg('--ref', 'benchmarks/longmemeval/data/longmemeval_s_cleaned.json');
 
 function normalize(text) {
+  const numberWords = {
+    zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5',
+    six: '6', seven: '7', eight: '8', nine: '9', ten: '10', eleven: '11', twelve: '12',
+  };
   return String(text || '')
     .toLowerCase()
+    .replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g, m => numberWords[m] || m)
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

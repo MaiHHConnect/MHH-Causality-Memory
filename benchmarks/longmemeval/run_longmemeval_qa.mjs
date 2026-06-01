@@ -16,12 +16,17 @@ function numArg(name, fallback) {
 const dataPath = arg('--data', 'benchmarks/longmemeval/data/longmemeval_s_cleaned.json');
 const outPath = arg('--out', 'benchmarks/longmemeval/results/s_qa_top5.jsonl');
 const topK = numArg('--topk', 5);
+const sessionCharLimit = numArg('--session-char-limit', 0);
 const limit = numArg('--limit', 0);
 const offset = numArg('--offset', 0);
 const model = arg('--model', 'minimax/MiniMax-M2.7-highspeed');
 const provider = arg('--provider', 'openclaw-cli');
+const apiBaseUrl = arg('--api-base-url', process.env.BUY_API_BASE_URL || process.env.OPENAI_BASE_URL || 'https://www.buy-api.com/v1');
 const promptMode = arg('--prompt-mode', 'generic');
 const contextMode = arg('--context-mode', 'bm25');
+const gbrainScript = arg('--gbrain-script', 'scripts/gbrain/gbrain.py');
+const gbrainDb = arg('--gbrain-db', process.env.GBRAIN_DB || '');
+const gbrainCacheDir = arg('--gbrain-cache-dir', '');
 const includeAbstention = args.includes('--include-abstention');
 const resume = !args.includes('--no-resume');
 const shardIndex = numArg('--shard-index', 0);
@@ -31,8 +36,24 @@ function tokens(text) {
   return String(text || '').toLowerCase().match(/[a-z0-9_]+/g)?.filter(t => t.length > 1) || [];
 }
 
+function safeId(value) {
+  return String(value || 'unknown').replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown';
+}
+
 function sessionText(session) {
   return session.map(turn => `${turn.role || ''}: ${turn.content || ''}`).join('\n');
+}
+
+function truncateText(text, limit) {
+  const value = String(text || '').trim();
+  return limit > 0 && value.length > limit ? `${value.slice(0, limit)} ...[truncated]` : value;
+}
+
+function promptTurnText(turn) {
+  const role = turn.role || '';
+  const content = String(turn.content || '').trim();
+  const limit = role === 'assistant' ? sessionCharLimit : 0;
+  return `${role}: ${truncateText(content, limit)}`;
 }
 
 function scoreSessions(question, sessions) {
@@ -99,9 +120,7 @@ function extractCausalLine(item, idx) {
   const assistant = assistantTurns.at(-1) || assistantTurns[0] || '';
   const source = user || assistant || sessionText(session);
   const compact = String(source).replace(/\s+/g, ' ').trim().slice(0, 200);
-  const answerEvidence = new Set(item.answer_session_ids || []).has(item.haystack_session_ids?.[idx]);
-  const marker = answerEvidence ? ' evidence' : '';
-  return `- ${date}${marker}: ${compact}`;
+  return `- ${date}: ${compact}`;
 }
 
 function buildCausaMemContext(item, ranked) {
@@ -120,13 +139,43 @@ function buildCausaMemContext(item, ranked) {
   return `<causamem-context>\nQuestion type: ${item.question_type || 'unknown'}\nPolicy: ${typeHint}\nTimeline order: newest to oldest. Each item is a compact causal memory line.\n\n${lines.join('\n')}\n</causamem-context>`;
 }
 
+function buildRealCausaMemContext(item) {
+  const env = { ...process.env };
+  if (gbrainCacheDir) {
+    const dbPath = path.join(gbrainCacheDir, `${safeId(item.question_id)}.db`);
+    if (!fs.existsSync(dbPath)) throw new Error(`missing per-case gbrain DB: ${dbPath}`);
+    env.GBRAIN_DB = dbPath;
+  } else if (gbrainDb) {
+    env.GBRAIN_DB = gbrainDb;
+  } else {
+    throw new Error('real_causamem requires --gbrain-cache-dir or --gbrain-db; refusing to use default DB');
+  }
+  const res = spawnSync('/usr/bin/python3', [gbrainScript, 'anchor', item.question, '--json'], {
+    encoding: 'utf8',
+    env,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (res.status !== 0) {
+    throw new Error(`gbrain anchor exited ${res.status}: ${(res.stderr || res.stdout || '').slice(0, 1000)}`);
+  }
+  const anchor = JSON.parse(res.stdout);
+  const body = anchor.anchor || anchor;
+  const sections = ['事实', '规则', '历史决策', '直接证据', '聚合候选', '时间线', '答案草稿', '建议答案', '因果链', '执行状态', '判断约束']
+    .map(key => {
+      const values = Array.isArray(body[key]) ? body[key] : [];
+      return `${key}:\n${values.length ? values.map(v => `- ${v}`).join('\n') : '- 待核实'}`;
+    })
+    .join('\n\n');
+  return `<real-causamem-context>\n${sections}\n</real-causamem-context>`;
+}
+
 function buildPrompt(item) {
   const ranked = scoreSessions(item.question, item.haystack_sessions || []).slice(0, topK);
   const chunks = ranked
     .map(([idx], i) => {
       const date = item.haystack_dates[idx];
       const content = (item.haystack_sessions[idx] || [])
-        .map(turn => `${turn.role || ''}: ${String(turn.content || '').trim()}`)
+        .map(turn => promptTurnText(turn))
         .join('\n\n');
       return `### Session ${i + 1}\nSession Date: ${date}\nSession Content:\n${content}`;
     })
@@ -136,10 +185,22 @@ function buildPrompt(item) {
     ? 'If the relevant history is insufficient to answer, say that the information is not available in the provided history.'
     : '';
   const taskHint = taskInstruction(item);
-  if (!['bm25', 'causamem', 'bm25+causamem'].includes(contextMode)) throw new Error(`unsupported context mode: ${contextMode}`);
-  const causamem = contextMode === 'bm25' ? '' : buildCausaMemContext(item, ranked);
-  const history = contextMode === 'causamem' ? causamem : contextMode === 'bm25+causamem' ? `${causamem}\n\nHistory Chats:\n\n${chunks}` : `History Chats:\n\n${chunks}`;
-  return `I will give you memory context between you and a user. Please answer the question based only on the provided memory context. Give a concise direct answer. ${abstentionHint} ${taskHint}\n\n${history}\n\nCurrent Date: ${item.question_date}\nQuestion: ${item.question}\nAnswer:`;
+  if (!['bm25', 'causamem', 'bm25+causamem', 'real_causamem', 'bm25+real_causamem'].includes(contextMode)) throw new Error(`unsupported context mode: ${contextMode}`);
+  const causamem = ['causamem', 'bm25+causamem'].includes(contextMode) ? buildCausaMemContext(item, ranked) : '';
+  const realCausaMem = ['real_causamem', 'bm25+real_causamem'].includes(contextMode) ? buildRealCausaMemContext(item) : '';
+  const history = contextMode === 'causamem'
+    ? causamem
+    : contextMode === 'bm25+causamem'
+      ? `${causamem}\n\nHistory Chats:\n\n${chunks}`
+      : contextMode === 'real_causamem'
+        ? realCausaMem
+        : contextMode === 'bm25+real_causamem'
+          ? `${realCausaMem}\n\nHistory Chats:\n\n${chunks}`
+          : `History Chats:\n\n${chunks}`;
+  const causamemHint = ['real_causamem', 'bm25+real_causamem'].includes(contextMode)
+    ? 'If the CausaMem context contains 答案草稿 or 建议答案, use it as the primary reasoning scaffold, then verify it against 直接证据 and History Chats before finalizing.'
+    : '';
+  return `Question: ${item.question}\nCurrent Date: ${item.question_date}\nQuestion Type: ${item.question_type || 'unknown'}\n\nI will give you memory context between you and a user. Please answer the question above based only on the provided memory context. Give a concise direct answer. ${abstentionHint} ${taskHint} ${causamemHint}\n\n${history}\n\nAnswer:`;
 }
 
 function callOpenClaw(prompt) {
@@ -156,9 +217,42 @@ function callOpenClaw(prompt) {
   return text.trim();
 }
 
+function callOpenAICompatible(prompt) {
+  const key = process.env.BUY_API_KEY || process.env.OPENAI_API_KEY;
+  if (!key) throw new Error('missing BUY_API_KEY or OPENAI_API_KEY for openai-compatible provider');
+  const url = `${apiBaseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const requestId = `longmemeval-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const res = spawnSync('curl', [
+    '-sS', '--fail-with-body',
+    '-X', 'POST', url,
+    '-H', `Authorization: Bearer ${key}`,
+    '-H', 'Content-Type: application/json',
+    '-H', `X-Request-ID: ${requestId}`,
+    '--data', JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
+      stream: false,
+    }),
+  ], {
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024,
+    timeout: 180000,
+  });
+  if (res.status !== 0) throw new Error(`openai-compatible exited ${res.status}: ${(res.stderr || res.stdout || '').slice(0, 1000)}`);
+  const parsed = JSON.parse(res.stdout);
+  const text = parsed?.choices?.[0]?.message?.content || parsed?.choices?.[0]?.text;
+  if (!text) throw new Error(`empty model output: ${res.stdout.slice(0, 1000)}`);
+  return String(text).trim();
+}
+
 function answerQuestion(item) {
-  if (provider === 'mock') return item.answer || '';
+  if (provider === 'mock') {
+    buildPrompt(item);
+    return item.answer || '';
+  }
   if (provider === 'openclaw-cli') return callOpenClaw(buildPrompt(item));
+  if (provider === 'openai-compatible') return callOpenAICompatible(buildPrompt(item));
   throw new Error(`unsupported provider: ${provider}`);
 }
 
@@ -196,6 +290,7 @@ for (const item of selected) {
       model,
       provider,
       topk: topK,
+      session_char_limit: sessionCharLimit,
       prompt_mode: promptMode,
       context_mode: contextMode,
     }) + '\n');
@@ -207,3 +302,4 @@ for (const item of selected) {
   }
 }
 console.log(JSON.stringify({ out: outPath, selected: selected.length, completed, skipped, failed }, null, 2));
+if (failed > 0) process.exitCode = 1;

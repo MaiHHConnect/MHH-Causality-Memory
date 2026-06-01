@@ -388,9 +388,10 @@ export SILICONFLOW_API_KEY="your-siliconflow-key"
 ### 4. 初始化数据库
 
 ```bash
-cd scripts/gbrain
-python gbrain.py init
+/usr/bin/python3 scripts/gbrain/gbrain.py init
 ```
+
+默认数据库路径统一为 `~/gbrain-data/brain.db`。如需临时库，显式设置 `GBRAIN_DB=/tmp/brain.db`。
 
 ### 5. 配置定时任务（可选）
 
@@ -408,19 +409,19 @@ crontab -e
 
 ```bash
 # 写入记忆（自动结构化压缩 + 13维因果推断）
-python gbrain.py put-structured my-event "讨论了系统设计，决定采用X架构"
+printf '%s' "讨论了系统设计，决定采用X架构" | /usr/bin/python3 scripts/gbrain/gbrain.py put-structured my-event
 
 # AI 压缩观测（查看完整结构化输出）
-python gbrain.py compress "你的观测内容"
+/usr/bin/python3 scripts/gbrain/gbrain.py compress "你的观测内容"
 
 # 因果链搜索
-python gbrain.py causal "系统设计"
+/usr/bin/python3 scripts/gbrain/gbrain.py causal "系统设计"
 
 # 向量语义搜索
-python gbrain.py query "架构方案"
+/usr/bin/python3 scripts/gbrain/gbrain.py query "架构方案"
 
 # 因果检索
-python gbrain.py causal "架构"
+/usr/bin/python3 scripts/gbrain/gbrain.py causal "架构"
 ```
 
 ### Cognitive Anchor CLI
@@ -462,10 +463,12 @@ For higher-quality Scene/Profile writes, OpenClaw can run a model gate after can
 ```bash
 /usr/bin/python3 scripts/gbrain/gbrain.py gate-candidates 20 --json
 /usr/bin/python3 scripts/gbrain/gbrain.py apply-gates < gates.json
-/usr/bin/python3 scripts/gbrain/gbrain.py commit --approved-only
+/usr/bin/python3 scripts/gbrain/gbrain.py commit
 ```
 
-The model only proposes JSON decisions. CausaMem still enforces deterministic gates: source evidence must appear in the candidate text, Profile confidence must be at least `0.75`, temporary status is rejected for Profile writes, and conflicts with active high-confidence profiles are held as `conflict` instead of overwriting.
+`commit` defaults to approved-only. To intentionally commit ungated candidates in local experiments, use `commit --allow-ungated`.
+
+The model only proposes JSON decisions. CausaMem still enforces deterministic gates: source evidence must appear in the original R0 raw event when available, Profile confidence must be at least `0.75`, temporary status is rejected for Profile writes, and conflicts with active high-confidence profiles are held as `conflict` instead of overwriting.
 
 Run recall regression checks with:
 
