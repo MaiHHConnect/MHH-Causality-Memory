@@ -48,6 +48,10 @@ def build_dream_structured(summary: str, date_str: str, dates: list[str]) -> dic
     future_hints = extract_section_lines(summary, "对未来的暗示")
     relation_findings = extract_section_lines(summary, "关系发现")
     stage_judgment = extract_section_lines(summary, "阶段判断")
+    source_refs = [
+        {"type": "memory_file", "date": d, "path": os.path.join(MEMORY_DIR, f"{d}.md")}
+        for d in dates
+    ]
     return {
         "decided": "",
         "learned": "\n".join(relation_findings + stage_judgment)[:1000],
@@ -62,6 +66,7 @@ def build_dream_structured(summary: str, date_str: str, dates: list[str]) -> dic
             "date": date_str,
             "period": "过去7天",
             "source_dates": dates,
+            "source_refs": source_refs,
             "relation_findings": relation_findings,
             "stage_judgment": stage_judgment,
             "causal_chains": causal_chains,
@@ -131,12 +136,18 @@ def run_big_dream():
         summary = generate_fallback_summary(content)
     
     # 写入文件
+    source_refs_yaml = "\n".join(
+        f"  - type: memory_file\n    date: {d}\n    path: {os.path.join(MEMORY_DIR, f'{d}.md')}"
+        for d in dates
+    )
     frontmatter = f"""---
 title: 浩哥的梦 {date_str}
 type: dream
 date: {date_str}
 period: 过去7天
 created: {datetime.now().isoformat()}
+source_refs:
+{source_refs_yaml}
 ---
 
 {summary}

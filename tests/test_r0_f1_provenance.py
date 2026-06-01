@@ -218,12 +218,43 @@ class R0F1ProvenanceTest(unittest.TestCase):
         conn = gbrain.get_db()
         page_cols = {row[1] for row in conn.execute("PRAGMA table_info(pages)")}
         candidate_cols = {row[1] for row in conn.execute("PRAGMA table_info(memory_candidates)")}
+        profile_cols = {row[1] for row in conn.execute("PRAGMA table_info(profiles)")}
         version = conn.execute("SELECT value FROM config WHERE key='schema_version'").fetchone()[0]
         conn.close()
 
         self.assertEqual(version, str(gbrain.SCHEMA_VERSION))
         self.assertTrue({"raw_event_id", "candidate_id", "evidence", "provenance"}.issubset(page_cols))
         self.assertTrue({"source", "evidence", "provenance"}.issubset(candidate_cols))
+        self.assertTrue({"source_refs", "profile_conflicts"}.issubset(profile_cols))
+
+    def test_upsert_profile_persists_source_refs(self):
+        gbrain.upsert_profile(
+            "user",
+            "decision_style",
+            "Prefer factual grounding",
+            evidence="浩哥要求先证据后结论",
+            confidence=0.9,
+            source_refs=[{"type": "raw_event", "id": 1}],
+        )
+
+        conn = sqlite3.connect(self.db_path)
+        row = conn.execute("SELECT source_refs FROM profiles WHERE profile_type='user' AND key='decision_style'").fetchone()
+        conn.close()
+
+        self.assertEqual(json.loads(row[0])[0]["type"], "raw_event")
+
+    def test_upsert_profile_records_conflict_on_value_change(self):
+        gbrain.upsert_profile("user", "decision_style", "A", confidence=0.9, source_refs=[{"type": "raw_event", "id": 1}])
+        gbrain.upsert_profile("user", "decision_style", "B", confidence=0.85, source_refs=[{"type": "raw_event", "id": 2}])
+
+        conn = sqlite3.connect(self.db_path)
+        row = conn.execute("SELECT value, profile_conflicts FROM profiles WHERE profile_type='user' AND key='decision_style'").fetchone()
+        conn.close()
+
+        conflicts = json.loads(row[1])["items"]
+        self.assertEqual(row[0], "B")
+        self.assertEqual(conflicts[0]["old_value"], "A")
+        self.assertEqual(conflicts[0]["new_value"], "B")
 
 
 if __name__ == "__main__":

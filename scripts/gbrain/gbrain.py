@@ -20,7 +20,7 @@ SILICONFLOW_KEY = os.environ.get("SILICONFLOW_API_KEY", "")
 
 EMBEDDING_MODEL = "local-gguf"
 EMBEDDING_DIM = 768  # local embedding model output dim
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 CAUSAL_ITEM_TEXT_LIMIT = 200
 CAUSAL_SPLIT_RE = re.compile(
     r"[；;。]\s*(?=(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}|\d+[.)、]|因为|由于|导致|所以|结果|前因|后果))"
@@ -104,6 +104,7 @@ def _schema_current(conn: sqlite3.Connection) -> bool:
         required = {
             "pages": {"raw_event_id", "candidate_id", "evidence", "provenance", "source"},
             "memory_candidates": {"source", "evidence", "provenance", "gate_status", "gate_payload", "gate_reason"},
+            "profiles": {"source_refs", "profile_conflicts"},
         }
         for table, columns in required.items():
             existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
@@ -256,6 +257,8 @@ def _init_schema(conn: sqlite3.Connection):
     _ensure_column(conn, "memory_candidates", "gate_status", "TEXT DEFAULT 'ungated'")
     _ensure_column(conn, "memory_candidates", "gate_payload", "TEXT")
     _ensure_column(conn, "memory_candidates", "gate_reason", "TEXT")
+    _ensure_column(conn, "profiles", "source_refs", "TEXT")
+    _ensure_column(conn, "profiles", "profile_conflicts", "TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_raw_event ON memory_candidates(raw_event_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pages_raw_event ON pages(raw_event_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pages_candidate ON pages(candidate_id)")
@@ -528,30 +531,31 @@ def get_activated_pages(page_ids: list[int], top_k: int = 3) -> list[dict]:
     return activated
 
 def rebuild_causal_edges_for_page(conn: sqlite3.Connection, page_id: int):
-    page = conn.execute("SELECT id, slug, cause, effect FROM pages WHERE id=?", (page_id,)).fetchone()
+    page = conn.execute("SELECT id, slug, summary_struct, cause, effect FROM pages WHERE id=?", (page_id,)).fetchone()
     if not page:
         return
     conn.execute("DELETE FROM causal_edges WHERE from_page=?", (page_id,))
-    for relation_type, text in (("cause", page["cause"]), ("effect", page["effect"])):
-        for item in _split_causal_items(text):
-            candidates = conn.execute(f"""
-                SELECT id, slug FROM pages
-                WHERE id != ? AND {_active_clause('pages')} AND LENGTH(slug) > 2
-                  AND (? LIKE '%' || slug || '%' OR title LIKE ? OR compiled_truth LIKE ?)
-                ORDER BY updated_at DESC LIMIT 5""",
-                (page_id, item, f"%{item[:40]}%", f"%{item[:40]}%")).fetchall()
-            if candidates:
-                for target in candidates:
-                    conn.execute("""
-                        INSERT INTO causal_edges (from_page, to_page, to_slug, relation_type, strength, confidence, evidence)
-                        VALUES (?, ?, ?, ?, 'weak', 0.65, ?)""",
-                        (page_id, target["id"], target["slug"], relation_type, item))
-            else:
-                synthetic_slug = slugify(item[:80]) or None
+    for causal_item in _normalize_causal_items(page["summary_struct"], page["cause"], page["effect"]):
+        relation_type = causal_item["relation"]
+        item = causal_item["text"]
+        candidates = conn.execute(f"""
+            SELECT id, slug FROM pages
+            WHERE id != ? AND {_active_clause('pages')} AND LENGTH(slug) > 2
+              AND (? LIKE '%' || slug || '%' OR title LIKE ? OR compiled_truth LIKE ?)
+            ORDER BY updated_at DESC LIMIT 5""",
+            (page_id, item, f"%{item[:40]}%", f"%{item[:40]}%")).fetchall()
+        if candidates:
+            for target in candidates:
                 conn.execute("""
-                    INSERT INTO causal_edges (from_page, to_slug, relation_type, strength, confidence, evidence)
-                    VALUES (?, ?, ?, 'weak', 0.45, ?)""",
-                    (page_id, synthetic_slug, relation_type, item))
+                    INSERT INTO causal_edges (from_page, to_page, to_slug, relation_type, strength, confidence, evidence)
+                    VALUES (?, ?, ?, ?, 'weak', 0.65, ?)""",
+                    (page_id, target["id"], target["slug"], relation_type, item))
+        else:
+            synthetic_slug = slugify(item[:80]) or None
+            conn.execute("""
+                INSERT INTO causal_edges (from_page, to_slug, relation_type, strength, confidence, evidence)
+                VALUES (?, ?, ?, 'weak', 0.45, ?)""",
+                (page_id, synthetic_slug, relation_type, item))
 
 def rebuild_all_causal_edges():
     conn = get_db()
@@ -578,6 +582,42 @@ def _safe_json_loads(value: str) -> dict:
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
+
+def _causal_items_from_fields(cause: str = "", effect: str = "", limit: Optional[int] = None) -> list[dict]:
+    items = []
+    for relation, text in (("cause", cause), ("effect", effect)):
+        for item in _split_causal_items(text, limit=limit):
+            items.append({"relation": relation, "text": item})
+            if limit is not None and len(items) >= limit:
+                return items
+    return items
+
+def _normalize_causal_items(summary_struct, cause: str = "", effect: str = "", limit: Optional[int] = None) -> list[dict]:
+    payload = _safe_json_loads(summary_struct) if isinstance(summary_struct, str) else (summary_struct if isinstance(summary_struct, dict) else {})
+    raw_items = payload.get("causal_items") if isinstance(payload, dict) else None
+    out = []
+    seen = set()
+    if isinstance(raw_items, list):
+        for raw in raw_items:
+            if isinstance(raw, dict):
+                relation = str(raw.get("relation") or raw.get("type") or "").strip().lower()
+                text = str(raw.get("text") or raw.get("content") or raw.get("atom") or raw.get("evidence") or "").strip()
+            else:
+                relation = ""
+                text = str(raw or "").strip()
+            if relation not in ("cause", "effect"):
+                continue
+            for item in _split_causal_items(text):
+                key = (relation, item)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append({"relation": relation, "text": item})
+                if limit is not None and len(out) >= limit:
+                    return out
+    if out:
+        return out
+    return _causal_items_from_fields(cause, effect, limit=limit)
 
 def _candidate_provenance(raw_event: Optional[sqlite3.Row] = None, extra: Optional[dict] = None) -> str:
     payload = dict(extra or {})
@@ -810,7 +850,14 @@ def apply_gate_payload_to_page(page_slug: str, content: str, gate_payload: Optio
             attach_scene(slug, page_slug)
         profile = gate.get("profile") if isinstance(gate, dict) else None
         if isinstance(profile, dict) and gate.get("action") == "profile":
-            upsert_profile(profile["profile_type"], profile["key"], profile["value"], gate.get("evidence", "")[:300], float(gate.get("confidence") or 0.75))
+            source_refs = gate.get("source_refs") if isinstance(gate.get("source_refs"), list) else []
+            if not source_refs and gate.get("raw_event_id"):
+                source_refs = [{"type": "raw_event", "id": gate["raw_event_id"]}]
+            upsert_profile(
+                profile["profile_type"], profile["key"], profile["value"],
+                gate.get("evidence", "")[:300], float(gate.get("confidence") or 0.75),
+                source_refs=source_refs,
+            )
             return
     auto_classify_scene_and_profile(page_slug, content, candidate_type)
 
@@ -924,15 +971,37 @@ def attach_scene(scene_slug: str, page_slug: str) -> tuple[int, int]:
     conn.close()
     return scene[0], page[0]
 
-def upsert_profile(profile_type: str, key: str, value: str, evidence: str = "", confidence: float = 0.6):
+def upsert_profile(profile_type: str, key: str, value: str, evidence: str = "", confidence: float = 0.6,
+                   source_refs: Optional[list[dict]] = None):
     conn = get_db()
+    source_refs = source_refs or []
+    existing = conn.execute(
+        "SELECT value, confidence, profile_conflicts FROM profiles WHERE profile_type=? AND key=? AND status='active'",
+        (profile_type, key),
+    ).fetchone()
+    conflicts = []
+    if existing:
+        conflicts = _safe_json_loads(existing["profile_conflicts"]).get("items", [])
+        if existing["value"] != value:
+            conflicts.append({
+                "old_value": existing["value"],
+                "new_value": value,
+                "old_confidence": existing["confidence"],
+                "new_confidence": confidence,
+                "evidence": evidence,
+                "source_refs": source_refs,
+                "created_at": datetime.utcnow().isoformat(),
+            })
     conn.execute("""
-        INSERT INTO profiles (profile_type, key, value, evidence, confidence, updated_at)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
+        INSERT INTO profiles (profile_type, key, value, evidence, confidence, source_refs, profile_conflicts, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
         ON CONFLICT(profile_type, key) DO UPDATE SET
             value=excluded.value, evidence=excluded.evidence, confidence=excluded.confidence,
-        status='active', updated_at=excluded.updated_at""",
-        (profile_type, key, value, evidence, confidence))
+            source_refs=excluded.source_refs, profile_conflicts=excluded.profile_conflicts,
+            status='active', updated_at=excluded.updated_at""",
+        (profile_type, key, value, evidence, confidence,
+         json.dumps(source_refs, ensure_ascii=False),
+         json.dumps({"items": conflicts}, ensure_ascii=False)))
     conn.commit()
     conn.close()
 
@@ -1280,16 +1349,18 @@ JSON格式：
 
         data = extract_json_from_response(text)
         if data:
+            cause = _clean_causal_text(data.get("cause", ""))
+            effect = _clean_causal_text(data.get("effect", ""))
             return {
                 "decided": data.get("decided", ""),
                 "learned": data.get("learned", ""),
                 "completed": data.get("completed", ""),
                 "next_steps": data.get("next_steps", ""),
                 "concepts": data.get("concepts", []),
-                "cause": _clean_causal_text(data.get("cause", "")),
-                "effect": _clean_causal_text(data.get("effect", "")),
+                "cause": cause,
+                "effect": effect,
                 "emotion": data.get("emotion", "无"),
-                "summary_struct": {"type": obs_type, "raw": raw_text[:500]}
+                "summary_struct": {"type": obs_type, "raw": raw_text[:500], "causal_items": _causal_items_from_fields(cause, effect)}
             }
     except Exception as e:
         print(f"[gbrain] compress failed: {e}", file=sys.stderr)
@@ -1316,7 +1387,16 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
     if existing and merge_causal:
         structured["cause"] = _merge_causal_text(structured.get("cause", ""), existing["cause"])
         structured["effect"] = _merge_causal_text(structured.get("effect", ""), existing["effect"])
-    summary_json = json.dumps(structured["summary_struct"], ensure_ascii=False)
+    summary_struct = structured.get("summary_struct")
+    if not isinstance(summary_struct, dict):
+        summary_struct = {"type": obs_type, "raw": content[:500]}
+    summary_struct["causal_items"] = _normalize_causal_items(
+        summary_struct,
+        structured.get("cause", ""),
+        structured.get("effect", ""),
+    )
+    structured["summary_struct"] = summary_struct
+    summary_json = json.dumps(summary_struct, ensure_ascii=False)
     concepts_json = json.dumps(structured.get("concepts", []), ensure_ascii=False)
 
     cursor.execute("""
@@ -1363,13 +1443,13 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
 def query_causal(keyword: str, limit: int = 10) -> list[dict]:
     conn = get_db()
     rows = conn.execute(f"""
-        SELECT DISTINCT p.slug, p.title, p.cause, p.effect, p.decided, p.learned, p.emotion,
+        SELECT DISTINCT p.slug, p.title, p.summary_struct, p.cause, p.effect, p.decided, p.learned, p.emotion,
                e.relation_type, e.evidence, e.confidence
         FROM pages p
         LEFT JOIN causal_edges e ON e.from_page = p.id
-        WHERE {_active_clause('p')} AND (p.slug LIKE ? OR p.title LIKE ? OR p.compiled_truth LIKE ? OR p.decided LIKE ? OR p.learned LIKE ? OR p.cause LIKE ? OR p.effect LIKE ? OR e.evidence LIKE ? OR e.to_slug LIKE ?)
+        WHERE {_active_clause('p')} AND (p.slug LIKE ? OR p.title LIKE ? OR p.compiled_truth LIKE ? OR p.decided LIKE ? OR p.learned LIKE ? OR p.cause LIKE ? OR p.effect LIKE ? OR p.summary_struct LIKE ? OR e.evidence LIKE ? OR e.to_slug LIKE ?)
         ORDER BY COALESCE(e.confidence, 0.0) DESC, p.updated_at DESC LIMIT ?""",
-        (f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", limit)).fetchall()
+        (f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", limit)).fetchall()
     results = [dict(r) for r in rows]
     if len(results) < limit:
         seen = {r["slug"] for r in results}
@@ -1377,13 +1457,13 @@ def query_causal(keyword: str, limit: int = 10) -> list[dict]:
             if len(results) >= limit:
                 break
             more = conn.execute(f"""
-                SELECT DISTINCT p.slug, p.title, p.cause, p.effect, p.decided, p.learned, p.emotion,
+                SELECT DISTINCT p.slug, p.title, p.summary_struct, p.cause, p.effect, p.decided, p.learned, p.emotion,
                        e.relation_type, e.evidence, e.confidence
                 FROM pages p
                 LEFT JOIN causal_edges e ON e.from_page = p.id
-                WHERE {_active_clause('p')} AND (p.slug LIKE ? OR p.title LIKE ? OR p.compiled_truth LIKE ? OR p.decided LIKE ? OR p.learned LIKE ? OR p.cause LIKE ? OR p.effect LIKE ? OR e.evidence LIKE ? OR e.to_slug LIKE ?)
+                WHERE {_active_clause('p')} AND (p.slug LIKE ? OR p.title LIKE ? OR p.compiled_truth LIKE ? OR p.decided LIKE ? OR p.learned LIKE ? OR p.cause LIKE ? OR p.effect LIKE ? OR p.summary_struct LIKE ? OR e.evidence LIKE ? OR e.to_slug LIKE ?)
                 ORDER BY COALESCE(e.confidence, 0.0) DESC, p.updated_at DESC LIMIT ?""",
-                (f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", limit)).fetchall()
+                (f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", f"%{term}%", limit)).fetchall()
             for row in more:
                 item = dict(row)
                 if item["slug"] in seen:
@@ -1756,6 +1836,10 @@ def _rank_causal_anchor_lines(question: str, field_lines: list[str], trace: list
     candidates.sort(key=lambda x: x[0], reverse=True)
     return _unique_causal_lines([line for _score, line in candidates], limit)
 
+def _line_date_key(line: str) -> str:
+    match = re.search(r"\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b", str(line or ""))
+    return match.group(0).replace("/", "-") if match else ""
+
 def _anchor_structured_lines(question: str, keys: tuple[str, ...], limit: int = 8) -> list[str]:
     conn = get_db()
     terms = _query_terms(question)
@@ -1783,7 +1867,7 @@ def _anchor_structured_lines(question: str, keys: tuple[str, ...], limit: int = 
         params.extend([like] * 5)
     where = f" AND ({' OR '.join(clauses)})" if clauses else ""
     rows = conn.execute(f"""
-        SELECT slug, title, summary_struct, compiled_truth, learned, cause, effect
+        SELECT slug, type, title, summary_struct, compiled_truth, learned, cause, effect, updated_at
         FROM pages WHERE {_active_clause('pages')}{where}
         ORDER BY updated_at DESC LIMIT ?""", params + [max(20, limit * 4)]).fetchall()
     scored = []
@@ -1811,10 +1895,17 @@ def _anchor_structured_lines(question: str, keys: tuple[str, ...], limit: int = 
                     bonus += 2.0
                 if any(x in line.lower() for x in ("i'm not a doctor", "not a medical professional", "large language model")):
                     bonus -= 2.5
+                if key in ("answer_plan", "proposed_answer"):
+                    bonus -= 1.0
+                if key == "timeline":
+                    bonus += 0.5
                 if overlap > 0 or term_hits or bonus > 0:
                     scored.append((overlap + term_hits * 0.5 + bonus, line))
     conn.close()
-    scored.sort(key=lambda x: x[0], reverse=True)
+    if "timeline" in keys:
+        scored.sort(key=lambda x: (_line_date_key(x[1]), x[0]), reverse=True)
+    else:
+        scored.sort(key=lambda x: x[0], reverse=True)
     return _unique_lines([line for _score, line in scored], limit)
 
 def _beads_snapshot(cwd: Optional[str] = None) -> dict:
@@ -1864,16 +1955,23 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
     field_lines = []
     for r in causal:
         slug = r.get("slug")
-        for item in _split_causal_items(r.get("cause")):
-            field_lines.append(f"[{slug}] 前因：{item}")
-        for item in _split_causal_items(r.get("effect")):
-            field_lines.append(f"[{slug}] 后果：{item}")
-    causal_lines = _rank_causal_anchor_lines(question, field_lines, trace, limit)
-    direct_evidence = _anchor_structured_lines(question, ("direct_evidence", "memory_atoms"), max(8, limit * 2))
-    aggregation_candidates = _anchor_structured_lines(question, ("aggregation_candidates",), max(8, limit * 2))
-    timeline = _anchor_structured_lines(question, ("timeline",), max(8, limit * 2))
-    answer_plan = _anchor_structured_lines(question, ("answer_plan",), max(6, limit))
-    proposed_answers = _anchor_structured_lines(question, ("proposed_answer",), 3)
+        for item in _normalize_causal_items(r.get("summary_struct"), r.get("cause"), r.get("effect")):
+            label = "前因" if item["relation"] == "cause" else "后果"
+            field_lines.append(f"[{slug}] {label}：{item['text']}")
+    anchor_budget = {
+        "direct_evidence": max(8, limit * 2),
+        "timeline": max(8, limit * 2),
+        "causal_chain": max(6, limit),
+        "aggregation_candidates": max(4, limit),
+        "answer_plan": min(3, max(1, limit // 2 + 1)),
+        "proposed_answer": 1,
+    }
+    causal_lines = _rank_causal_anchor_lines(question, field_lines, trace, anchor_budget["causal_chain"])
+    direct_evidence = _anchor_structured_lines(question, ("direct_evidence", "memory_atoms"), anchor_budget["direct_evidence"])
+    aggregation_candidates = _anchor_structured_lines(question, ("aggregation_candidates",), anchor_budget["aggregation_candidates"])
+    timeline = _anchor_structured_lines(question, ("timeline",), anchor_budget["timeline"])
+    answer_plan = _anchor_structured_lines(question, ("answer_plan",), anchor_budget["answer_plan"])
+    proposed_answers = _anchor_structured_lines(question, ("proposed_answer",), anchor_budget["proposed_answer"])
 
     beads = _beads_snapshot(beads_cwd)
     execution_status = []
@@ -1905,8 +2003,9 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
             "因果链": causal_lines,
             "执行状态": execution_status[:limit],
             "判断约束": [
-                "不要直接猜；先依据事实、规则、历史决策、直接证据、答案草稿和因果链判断。",
-                "如果建议答案有证据支持，优先用它作为推理脚手架，并用直接证据核验。",
+                "不要直接猜；先依据事实、规则、历史决策、直接证据、时间线和因果链判断。",
+                "答案草稿/建议答案只可作为低权重假设；必须被直接证据和时间线支持后才能采用。",
+                "时间冲突时优先使用带日期的较新直接证据；不能让答案草稿覆盖时间链。",
                 "缺少证据时标记“待核实”。",
                 "涉及执行进度时优先参考 Beads 状态；Beads 缺失时不要编造。",
             ],

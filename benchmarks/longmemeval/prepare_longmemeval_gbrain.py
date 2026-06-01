@@ -8,7 +8,6 @@ import importlib.util
 import json
 import os
 import re
-import shutil
 from pathlib import Path
 
 
@@ -648,15 +647,16 @@ def main() -> None:
     parser.add_argument("--gbrain", default="scripts/gbrain/gbrain.py")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--pipeline", choices=["lite", "full8"], default="lite")
-    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--force", action="store_true", help="Rebuild DBs for selected question ids only; does not delete the cache directory.")
+    parser.add_argument("--delete-cache-dir", action="store_true", help="Disabled safety valve; remove cache directories manually if needed.")
     args = parser.parse_args()
 
     data = json.loads(Path(args.data).read_text(encoding="utf-8"))
     if args.limit > 0:
         data = data[:args.limit]
     out_dir = Path(args.out_dir)
-    if args.force and out_dir.exists():
-        shutil.rmtree(out_dir)
+    if args.delete_cache_dir and out_dir.exists():
+        raise SystemExit("--delete-cache-dir is disabled for safety; remove the directory manually if you really intend to reset it.")
     out_dir.mkdir(parents=True, exist_ok=True)
     gbrain = load_gbrain(args.gbrain)
 

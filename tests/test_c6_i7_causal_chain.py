@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import sys
 import tempfile
@@ -85,6 +86,62 @@ class CausalChainTest(unittest.TestCase):
 
         self.assertEqual([r[1] for r in rows], ["2026-05-01 A -> B", "2026-05-02 B -> C", "2026-05-03 C -> D"])
 
+    def test_put_page_structured_writes_summary_struct_causal_items_from_fields(self):
+        structured = self._structured("2026-05-01 原因A -> 结果B", "2026-05-02 结果B -> 行动C")
+
+        with patch.object(gbrain, "compress_observation", return_value=structured), \
+             patch.object(gbrain, "_embed_page_async"):
+            gbrain.put_page_structured("causal-items-page", "content", title="causal")
+
+        conn = sqlite3.connect(self.db_path)
+        row = conn.execute("SELECT summary_struct FROM pages WHERE slug='causal-items-page'").fetchone()
+        conn.close()
+
+        payload = json.loads(row[0])
+        self.assertEqual(payload["causal_items"], [
+            {"relation": "cause", "text": "2026-05-01 原因A -> 结果B"},
+            {"relation": "effect", "text": "2026-05-02 结果B -> 行动C"},
+        ])
+
+    def test_rebuild_causal_edges_uses_summary_struct_causal_items(self):
+        summary_struct = json.dumps({
+            "type": "INSIGHT",
+            "raw": "test",
+            "causal_items": [
+                {"relation": "cause", "text": "2026-05-01 struct cause -> page"},
+                {"relation": "effect", "text": "2026-05-02 page -> struct effect"},
+            ],
+        }, ensure_ascii=False)
+
+        conn = gbrain.get_db()
+        cur = conn.execute("""
+            INSERT INTO pages (slug, title, compiled_truth, summary_struct, cause, effect)
+            VALUES ('struct-chain-page', 'Struct Chain Page', 'body', ?, '', '')
+        """, (summary_struct,))
+        page_id = cur.lastrowid
+
+        gbrain.rebuild_causal_edges_for_page(conn, page_id)
+        rows = conn.execute("SELECT relation_type, evidence FROM causal_edges ORDER BY id").fetchall()
+        conn.close()
+
+        self.assertEqual([r[0] for r in rows], ["cause", "effect"])
+        self.assertEqual([r[1] for r in rows], [
+            "2026-05-01 struct cause -> page",
+            "2026-05-02 page -> struct effect",
+        ])
+
+    def test_normalize_causal_items_falls_back_to_cause_effect(self):
+        items = gbrain._normalize_causal_items(
+            {"type": "INSIGHT", "raw": "test"},
+            "2026-05-01 old cause -> page",
+            "2026-05-02 page -> old effect",
+        )
+
+        self.assertEqual(items, [
+            {"relation": "cause", "text": "2026-05-01 old cause -> page"},
+            {"relation": "effect", "text": "2026-05-02 page -> old effect"},
+        ])
+
     def test_anchor_keeps_causal_lines_unflattened(self):
         conn = gbrain.get_db()
         conn.execute("""
@@ -101,6 +158,31 @@ class CausalChainTest(unittest.TestCase):
 
         self.assertIn("[anchor-page] 前因：2026-05-01 A -> B", anchor["anchor"]["因果链"])
         self.assertIn("[anchor-page] 前因：2026-05-02 B -> C", anchor["anchor"]["因果链"])
+
+    def test_anchor_uses_summary_struct_causal_items(self):
+        summary_struct = json.dumps({
+            "type": "INSIGHT",
+            "raw": "test",
+            "causal_items": [
+                {"relation": "cause", "text": "2026-05-01 struct A -> B"},
+                {"relation": "effect", "text": "2026-05-02 struct B -> C"},
+            ],
+        }, ensure_ascii=False)
+        conn = gbrain.get_db()
+        conn.execute("""
+            INSERT INTO pages (slug, title, compiled_truth, summary_struct, cause, effect)
+            VALUES ('struct-anchor-page', 'Struct Anchor Page', 'memory body', ?, '', '')
+        """, (summary_struct,))
+        conn.commit()
+        conn.close()
+
+        with patch.object(gbrain, "search_with_activation", return_value=[]), \
+             patch.object(gbrain, "trace_memory", return_value=[]), \
+             patch.object(gbrain, "_beads_snapshot", return_value={"available": False}):
+            anchor = gbrain.build_cognitive_anchor("struct A", limit=5)
+
+        self.assertIn("[struct-anchor-page] 前因：2026-05-01 struct A -> B", anchor["anchor"]["因果链"])
+        self.assertIn("[struct-anchor-page] 后果：2026-05-02 struct B -> C", anchor["anchor"]["因果链"])
 
     def test_anchor_limits_injection_without_truncating_storage(self):
         cause = "\n".join(f"2026-05-{i:02d} A{i} -> B{i}" for i in range(1, 16))
@@ -119,7 +201,53 @@ class CausalChainTest(unittest.TestCase):
             anchor = gbrain.build_cognitive_anchor("A", limit=5)
 
         self.assertEqual(len(stored.splitlines()), 15)
-        self.assertEqual(len(anchor["anchor"]["因果链"]), 5)
+        self.assertEqual(len(anchor["anchor"]["因果链"]), 6)
+
+    def test_i7_anchor_limits_answer_plan_below_timeline(self):
+        summary = json.dumps({
+            "type": "D5_LONGMEMEVAL_DREAM",
+            "timeline": [f"2026-06-{i:02d} timeline state {i}" for i in range(1, 8)],
+            "answer_plan": [f"plan {i}" for i in range(1, 8)],
+        }, ensure_ascii=False)
+        conn = gbrain.get_db()
+        conn.execute("""
+            INSERT INTO pages (slug, title, compiled_truth, summary_struct)
+            VALUES ('budget-page', 'Budget Page', 'timeline plan body', ?)
+        """, (summary,))
+        conn.commit()
+        conn.close()
+
+        with patch.object(gbrain, "search_with_activation", return_value=[]), \
+             patch.object(gbrain, "trace_memory", return_value=[]), \
+             patch.object(gbrain, "_beads_snapshot", return_value={"available": False}):
+            anchor = gbrain.build_cognitive_anchor("timeline plan", limit=5)
+
+        self.assertGreaterEqual(len(anchor["anchor"]["时间线"]), len(anchor["anchor"]["答案草稿"]))
+        self.assertLessEqual(len(anchor["anchor"]["答案草稿"]), 3)
+
+    def test_i7_anchor_timeline_prefers_dated_newer_chain(self):
+        summary = json.dumps({
+            "type": "W4_LONGMEMEVAL_WIKI",
+            "timeline": ["2026-05-01 old state", "2026-06-01 new state"],
+        }, ensure_ascii=False)
+        conn = gbrain.get_db()
+        conn.execute("""
+            INSERT INTO pages (slug, title, compiled_truth, summary_struct)
+            VALUES ('timeline-page', 'Timeline Page', 'state body', ?)
+        """, (summary,))
+        conn.commit()
+        conn.close()
+
+        with patch.object(gbrain, "search_with_activation", return_value=[]), \
+             patch.object(gbrain, "trace_memory", return_value=[]), \
+             patch.object(gbrain, "_beads_snapshot", return_value={"available": False}):
+            anchor = gbrain.build_cognitive_anchor("state", limit=5)
+
+        timeline = anchor["anchor"]["时间线"]
+        self.assertLess(
+            next(i for i, v in enumerate(timeline) if "2026-06-01" in v),
+            next(i for i, v in enumerate(timeline) if "2026-05-01" in v),
+        )
 
     def test_trace_memory_deduplicates_and_sorts_edges(self):
         conn = gbrain.get_db()
@@ -157,7 +285,7 @@ class CausalChainTest(unittest.TestCase):
              patch.object(gbrain, "_beads_snapshot", return_value={"available": False}):
             anchor = gbrain.build_cognitive_anchor("direct A", limit=1)
 
-        self.assertEqual(anchor["anchor"]["因果链"], ["[field-page] 前因：2026-05-01 direct A -> B"])
+        self.assertEqual(anchor["anchor"]["因果链"][0], "[field-page] 前因：2026-05-01 direct A -> B")
 
     def test_query_causal_uses_token_fallback_for_long_question(self):
         conn = gbrain.get_db()

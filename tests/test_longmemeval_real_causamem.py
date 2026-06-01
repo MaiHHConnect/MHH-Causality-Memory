@@ -77,6 +77,51 @@ class LongMemEvalRealCausaMemTest(unittest.TestCase):
         self.assertNotIn("SECRET_GOLD_ANSWER", manifest_text)
         self.assertNotIn("secret-label-only", manifest_text)
 
+    def test_prepare_force_does_not_delete_unrelated_cache_files(self):
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        sentinel = self.cache_dir / "keep.json"
+        sentinel.write_text("do not delete", encoding="utf-8")
+
+        proc = subprocess.run(
+            [
+                "/usr/bin/python3", str(PREPARE_PATH),
+                "--data", str(self.data_path),
+                "--out-dir", str(self.cache_dir),
+                "--gbrain", str(GBRAIN_PATH),
+                "--force",
+            ],
+            text=True,
+            capture_output=True,
+            timeout=60,
+            cwd=str(ROOT),
+        )
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(sentinel.exists())
+
+    def test_prepare_delete_cache_dir_is_refused(self):
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        sentinel = self.cache_dir / "keep.json"
+        sentinel.write_text("do not delete", encoding="utf-8")
+
+        proc = subprocess.run(
+            [
+                "/usr/bin/python3", str(PREPARE_PATH),
+                "--data", str(self.data_path),
+                "--out-dir", str(self.cache_dir),
+                "--gbrain", str(GBRAIN_PATH),
+                "--delete-cache-dir",
+            ],
+            text=True,
+            capture_output=True,
+            timeout=60,
+            cwd=str(ROOT),
+        )
+
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertTrue(sentinel.exists())
+        self.assertIn("--delete-cache-dir", proc.stderr)
+
     def test_special_question_id_uses_safe_db_name(self):
         item = {**self.item, "question_id": "id/with space"}
         data_path = self.tmp_path / "special.json"
@@ -184,11 +229,20 @@ class LongMemEvalRealCausaMemTest(unittest.TestCase):
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         anchor = json.loads(proc.stdout)["anchor"]
-        joined = "\n".join(anchor["答案草稿"] + anchor["建议答案"])
-        self.assertIn("Dr. Smith", joined)
-        self.assertIn("Dr. Patel", joined)
-        self.assertIn("Dr. Lee", joined)
-        self.assertIn("3 different doctors", joined)
+        evidence_joined = "\n".join(anchor["直接证据"] + anchor["时间线"])
+        hypothesis_joined = "\n".join(anchor["答案草稿"] + anchor["建议答案"])
+        self.assertIn("Dr. Smith", evidence_joined)
+        self.assertIn("Dr. Patel", evidence_joined)
+        self.assertIn("Dr. Lee", evidence_joined)
+        self.assertIn("3 different doctors", hypothesis_joined)
+        self.assertLessEqual(len(anchor["答案草稿"]), 3)
+
+    def test_real_causamem_prompt_marks_answer_plan_low_priority(self):
+        text = RUNNER_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("primary reasoning scaffold", text)
+        self.assertIn("low-priority hypotheses", text)
+        self.assertIn("直接证据", text)
+        self.assertIn("时间线", text)
 
     def test_runner_real_mode_uses_cache_dir(self):
         prepare = load_module(PREPARE_PATH)
@@ -214,6 +268,53 @@ class LongMemEvalRealCausaMemTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         rows = [json.loads(line) for line in self.out_path.read_text().splitlines() if line.strip()]
         self.assertEqual(rows[0]["context_mode"], "bm25+real_causamem")
+
+    def test_runner_status_only_reports_pending_without_writing_output(self):
+        proc = subprocess.run(
+            [
+                "node", str(RUNNER_PATH),
+                "--data", str(self.data_path),
+                "--out", str(self.out_path),
+                "--provider", "mock",
+                "--status-only",
+            ],
+            text=True,
+            capture_output=True,
+            timeout=60,
+            cwd=str(ROOT),
+        )
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        status = json.loads(proc.stdout)
+        self.assertEqual(status["selected"], 1)
+        self.assertEqual(status["pending"], 1)
+        self.assertEqual(status["done"], 0)
+        self.assertFalse(self.out_path.exists())
+
+    def test_runner_writes_summary_file(self):
+        summary_path = self.tmp_path / "summary.json"
+
+        proc = subprocess.run(
+            [
+                "node", str(RUNNER_PATH),
+                "--data", str(self.data_path),
+                "--out", str(self.out_path),
+                "--provider", "mock",
+                "--no-resume",
+                "--summary-out", str(summary_path),
+            ],
+            text=True,
+            capture_output=True,
+            timeout=60,
+            cwd=str(ROOT),
+        )
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        self.assertEqual(summary["selected"], 1)
+        self.assertEqual(summary["completed"], 1)
+        self.assertEqual(summary["failed"], 0)
+        self.assertEqual(summary["remaining"], 0)
 
     def test_runner_real_mode_missing_db_fails(self):
         proc = subprocess.run(

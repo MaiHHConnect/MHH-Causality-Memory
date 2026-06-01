@@ -69,6 +69,14 @@ class D5DreamTest(unittest.TestCase):
         self.assertEqual(structured["cause"], "2026-05-30 A -> B -> C")
         self.assertEqual(structured["effect"], "下一步补 R0 provenance")
 
+    def test_build_dream_structured_includes_source_refs(self):
+        structured = dream.build_dream_structured("## 因果串线\n- A -> B\n", "2026-06-01", ["2026-05-31"])
+
+        refs = structured["summary_struct"]["source_refs"]
+        self.assertEqual(refs[0]["type"], "memory_file")
+        self.assertEqual(refs[0]["date"], "2026-05-31")
+        self.assertTrue(refs[0]["path"].endswith("2026-05-31.md"))
+
     def test_run_big_dream_writes_deterministic_cause_to_gbrain(self):
         date = "2026-05-31"
         with open(os.path.join(self.memory_dir, f"{date}.md"), "w") as fh:
@@ -96,11 +104,18 @@ class D5DreamTest(unittest.TestCase):
         edges = conn.execute("SELECT evidence FROM causal_edges").fetchall()
         conn.close()
 
+        payload = json.loads(row["summary_struct"])
         self.assertEqual(row["type"], "dream")
-        self.assertEqual(json.loads(row["summary_struct"])["type"], "D5_DREAM")
+        self.assertEqual(payload["type"], "D5_DREAM")
+        self.assertEqual(payload["source_refs"][0]["type"], "memory_file")
         self.assertIn("2026-05-31 A -> B -> C", row["cause"])
         self.assertIn("2026-06-01 验证 C", row["effect"])
         self.assertTrue(any("2026-05-31 A -> B -> C" in edge["evidence"] for edge in edges))
+        dream_file = os.path.join(self.wiki_dir, "_dream", "dream-2026-06-01.md")
+        with open(dream_file) as fh:
+            body = fh.read()
+        self.assertIn("source_refs:", body)
+        self.assertIn("type: memory_file", body)
 
     def test_structured_override_replaces_old_dream_causal_chain(self):
         first = dream.build_dream_structured("## 因果串线\n- 2026-05-31 old -> stale\n", "2026-06-01", ["2026-05-31"])
