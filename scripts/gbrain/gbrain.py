@@ -8,9 +8,14 @@ Features (v0.16 enhanced):
   - Original: causal reasoning fields (cause/effect) + 13-dim inference
 """
 
-import sqlite3, os, sys, re, hashlib, json, requests, struct, shutil, time, subprocess
+import sqlite3, os, sys, re, hashlib, json, struct, shutil, time, subprocess
 from datetime import datetime
 from typing import Optional
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 # ── Config ──────────────────────────────────────────────────────────────────
 GBRAIN_DB = os.environ.get("GBRAIN_DB", os.path.expanduser("~/gbrain-data/brain.db"))
@@ -20,7 +25,7 @@ SILICONFLOW_KEY = os.environ.get("SILICONFLOW_API_KEY", "")
 
 EMBEDDING_MODEL = "local-gguf"
 EMBEDDING_DIM = 768  # local embedding model output dim
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 10
 CAUSAL_ITEM_TEXT_LIMIT = 200
 CAUSAL_SPLIT_RE = re.compile(
     r"[；;。]\s*(?=(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}|\d+[.)、]|因为|由于|导致|所以|结果|前因|后果))"
@@ -105,6 +110,10 @@ def _schema_current(conn: sqlite3.Connection) -> bool:
             "pages": {"raw_event_id", "candidate_id", "evidence", "provenance", "source"},
             "memory_candidates": {"source", "evidence", "provenance", "gate_status", "gate_payload", "gate_reason"},
             "profiles": {"source_refs", "profile_conflicts"},
+            "causal_beliefs": {"subject", "predicate", "value", "status", "supersedes", "superseded_by"},
+            "belief_candidates": {"subject", "predicate", "value", "belief_type", "candidate_status", "evidence", "evidence_count", "rejection_reason"},
+            "causal_events": {"event_time", "actor", "event", "cause", "effect", "evidence"},
+            "state_transitions": {"subject", "state_key", "before_value", "after_value", "trigger"},
         }
         for table, columns in required.items():
             existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
@@ -219,6 +228,75 @@ def _init_schema(conn: sqlite3.Connection):
             updated_at TEXT DEFAULT (datetime('now')),
             UNIQUE(profile_type, key)
         );
+        CREATE TABLE IF NOT EXISTS causal_beliefs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            predicate TEXT NOT NULL,
+            value TEXT NOT NULL,
+            belief_type TEXT DEFAULT 'state',
+            scope TEXT DEFAULT 'global',
+            status TEXT DEFAULT 'active',
+            confidence REAL DEFAULT 0.6,
+            valid_from TEXT,
+            valid_until TEXT,
+            evidence TEXT,
+            source_slug TEXT,
+            source_refs TEXT,
+            supersedes TEXT,
+            superseded_by INTEGER,
+            contradiction TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS belief_candidates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            predicate TEXT NOT NULL,
+            value TEXT NOT NULL,
+            belief_type TEXT NOT NULL,
+            scope TEXT DEFAULT 'global',
+            candidate_status TEXT DEFAULT 'pending',
+            confidence REAL DEFAULT 0.4,
+            evidence TEXT NOT NULL,
+            reason TEXT,
+            evidence_count INTEGER DEFAULT 1,
+            rejection_reason TEXT,
+            source_slug TEXT,
+            source_refs TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS causal_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_time TEXT,
+            actor TEXT NOT NULL,
+            event TEXT NOT NULL,
+            cause TEXT,
+            effect TEXT,
+            context TEXT,
+            evidence TEXT NOT NULL,
+            relation_type TEXT DEFAULT 'causal',
+            strength TEXT DEFAULT 'weak',
+            confidence REAL DEFAULT 0.6,
+            source_slug TEXT,
+            source_refs TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS state_transitions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            state_key TEXT NOT NULL,
+            before_value TEXT,
+            after_value TEXT NOT NULL,
+            trigger TEXT,
+            reason TEXT,
+            evidence TEXT,
+            source_slug TEXT,
+            event_time TEXT,
+            confidence REAL DEFAULT 0.6,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
         CREATE INDEX IF NOT EXISTS idx_links_from ON links(from_page);
         CREATE INDEX IF NOT EXISTS idx_links_to ON links(to_slug);
         CREATE INDEX IF NOT EXISTS idx_tags_page ON tags(page_id);
@@ -232,6 +310,16 @@ def _init_schema(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_candidates_status ON memory_candidates(status);
         CREATE INDEX IF NOT EXISTS idx_scenes_slug ON scenes(slug);
         CREATE INDEX IF NOT EXISTS idx_profiles_type ON profiles(profile_type);
+        CREATE INDEX IF NOT EXISTS idx_causal_beliefs_lookup ON causal_beliefs(subject, predicate, scope, status);
+        CREATE INDEX IF NOT EXISTS idx_causal_beliefs_source ON causal_beliefs(source_slug);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_causal_beliefs_unique_evidence ON causal_beliefs(source_slug, subject, predicate, value);
+        CREATE INDEX IF NOT EXISTS idx_belief_candidates_lookup ON belief_candidates(subject, predicate, scope, candidate_status);
+        CREATE INDEX IF NOT EXISTS idx_belief_candidates_source ON belief_candidates(source_slug);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_belief_candidates_unique_evidence ON belief_candidates(source_slug, subject, predicate, value);
+        CREATE INDEX IF NOT EXISTS idx_causal_events_lookup ON causal_events(actor, event_time, source_slug);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_causal_events_unique_evidence ON causal_events(source_slug, actor, event, evidence);
+        CREATE INDEX IF NOT EXISTS idx_state_transitions_lookup ON state_transitions(subject, state_key, event_time);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_state_transitions_unique_evidence ON state_transitions(source_slug, subject, state_key, after_value, event_time);
     """)
     _ensure_column(conn, "pages", "emotion", "TEXT DEFAULT '无'")
     _ensure_column(conn, "pages", "status", "TEXT DEFAULT 'active'")
@@ -259,6 +347,16 @@ def _init_schema(conn: sqlite3.Connection):
     _ensure_column(conn, "memory_candidates", "gate_reason", "TEXT")
     _ensure_column(conn, "profiles", "source_refs", "TEXT")
     _ensure_column(conn, "profiles", "profile_conflicts", "TEXT")
+    _ensure_column(conn, "causal_beliefs", "supersedes", "TEXT")
+    _ensure_column(conn, "causal_beliefs", "superseded_by", "INTEGER")
+    _ensure_column(conn, "belief_candidates", "reason", "TEXT")
+    _ensure_column(conn, "belief_candidates", "source_refs", "TEXT")
+    _ensure_column(conn, "belief_candidates", "evidence_count", "INTEGER DEFAULT 1")
+    _ensure_column(conn, "belief_candidates", "rejection_reason", "TEXT")
+    _ensure_column(conn, "causal_events", "context", "TEXT")
+    _ensure_column(conn, "causal_events", "relation_type", "TEXT DEFAULT 'causal'")
+    _ensure_column(conn, "causal_events", "strength", "TEXT DEFAULT 'weak'")
+    _ensure_column(conn, "causal_events", "source_refs", "TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_raw_event ON memory_candidates(raw_event_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pages_raw_event ON pages(raw_event_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pages_candidate ON pages(candidate_id)")
@@ -272,6 +370,8 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, spec: str)
 
 # ── Embeddings ──────────────────────────────────────────────────────────────
 def get_embedding(text: str) -> list[float]:
+    if requests is None:
+        raise RuntimeError("requests package not installed; embedding API unavailable")
     # Try local embedding service first
     try:
         resp = requests.post(
@@ -338,6 +438,54 @@ def build_timeline(sections: list[tuple[str, str]]) -> str:
         entries.append(meta)
         entries.append(body)
     return "\n\n".join(entries)
+
+def _infer_event_time(slug: str, title: str, text: str) -> str:
+    for value in (slug, title, text):
+        match = re.search(r"20\d{2}[-/年]\d{1,2}[-/月]\d{1,2}", str(value or ""))
+        if match:
+            return match.group(0).replace("年", "-").replace("月", "-").replace("/", "-").rstrip("日")
+    return ""
+
+def _infer_actor(text: str) -> str:
+    value = str(text or "")
+    if any(token in value for token in ("浩哥", "用户", "你要求", "你说", "你希望")):
+        return "浩哥"
+    if any(token in value for token in ("OpenClaw", "openclaw", "系统", "cron", "任务")):
+        return "OpenClaw"
+    return "待核实"
+
+def _fallback_causal_events_from_sections(slug: str, title: str, sections: list[tuple[str, str]], limit: int = 12) -> list[dict]:
+    events = []
+    seen = set()
+    for header, body in sections:
+        text = f"{header}\n{body}".strip()
+        if not text:
+            continue
+        heading = header or title or slug
+        event = re.sub(r"^\d{1,2}:\d{2}\s*[—-]\s*", "", heading).strip() or heading
+        bullets = [line.strip(" -\t") for line in body.splitlines() if line.strip().startswith(("-", "*"))]
+        cause = next((line for line in bullets if any(k in line for k in ("原因", "因为", "由于", "根因", "触发"))), "")
+        effect = next((line for line in bullets if any(k in line for k in ("结果", "完成", "已", "导致", "修复", "解决"))), "")
+        evidence = " ".join((bullets[:2] or [body.splitlines()[0] if body.splitlines() else event]))[:1000]
+        key = (event, evidence)
+        if key in seen:
+            continue
+        seen.add(key)
+        events.append({
+            "time": _infer_event_time(slug, title, text),
+            "actor": _infer_actor(text),
+            "event": event[:500],
+            "cause": cause[:1000],
+            "effect": effect[:1000],
+            "context": heading[:1000],
+            "evidence": evidence,
+            "relation_type": "context" if not cause and not effect else "causal",
+            "strength": "unknown" if not cause or not effect else "weak",
+            "confidence": 0.45,
+        })
+        if len(events) >= limit:
+            break
+    return events
 
 # ── SPlus-inspired: Time Decay ────────────────────────────────────────────────
 def time_decay(updated_at_str: str, half_life_days: float = 30) -> float:
@@ -618,6 +766,269 @@ def _normalize_causal_items(summary_struct, cause: str = "", effect: str = "", l
     if out:
         return out
     return _causal_items_from_fields(cause, effect, limit=limit)
+
+def _as_list(value) -> list:
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+USER_BELIEF_TYPES = {
+    "user_preference",
+    "negative_preference",
+    "user_constraint",
+    "user_goal",
+    "user_style",
+    "user_state",
+    "user_decision",
+}
+BELIEF_TYPE_ALIASES = {
+    "preference": "user_preference",
+    "pref": "user_preference",
+    "negative": "negative_preference",
+    "dislike": "negative_preference",
+    "constraint": "user_constraint",
+    "goal": "user_goal",
+    "style": "user_style",
+    "state": "user_state",
+    "decision": "user_decision",
+}
+
+def _normalize_user_subject(value: str) -> str:
+    subject = str(value or "").strip()
+    if not subject or subject.lower() in {"user", "haoge", "浩哥"} or subject in {"用户", "使用者", "浩哥本人"}:
+        return "haoge"
+    if subject.startswith(("bench:", "agent:", "project:", "external:")) or subject == "simulated_user":
+        return subject[:160]
+    return f"external:{subject}"[:160]
+
+def _normalize_user_belief_type(value: str) -> str:
+    kind = str(value or "user_state").strip().lower().replace("-", "_")
+    kind = BELIEF_TYPE_ALIASES.get(kind, kind)
+    return kind if kind in USER_BELIEF_TYPES else ""
+
+def _normalize_causal_beliefs(summary_struct) -> list[dict]:
+    payload = _safe_json_loads(summary_struct) if isinstance(summary_struct, str) else (summary_struct if isinstance(summary_struct, dict) else {})
+    raw_items = payload.get("causal_beliefs") or payload.get("beliefs") if isinstance(payload, dict) else []
+    out = []
+    seen = set()
+    for raw in _as_list(raw_items):
+        if isinstance(raw, str):
+            subject, predicate, value = "haoge", "state", raw.strip()
+            item = {"belief_type": "user_state"}
+        elif isinstance(raw, dict):
+            item = raw
+            subject = _normalize_user_subject(item.get("subject") or item.get("entity") or "haoge")
+            predicate = str(item.get("predicate") or item.get("key") or item.get("state_key") or "state").strip()
+            value = str(item.get("value") or item.get("belief") or item.get("after_value") or item.get("text") or "").strip()
+        else:
+            continue
+        if not subject or not predicate or not value:
+            continue
+        belief_type = _normalize_user_belief_type(item.get("belief_type") or item.get("type") or "user_state")
+        if not belief_type:
+            continue
+        key = (subject.lower(), predicate.lower(), value.lower(), belief_type)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "subject": subject[:160],
+            "predicate": predicate[:120],
+            "value": value[:500],
+            "belief_type": belief_type,
+            "scope": str(item.get("scope") or "global")[:120],
+            "status": str(item.get("status") or "active")[:40],
+            "confidence": float(item.get("confidence") if item.get("confidence") is not None else 0.6),
+            "valid_from": str(item.get("valid_from") or item.get("date") or "")[:80],
+            "valid_until": str(item.get("valid_until") or "")[:80],
+            "evidence": str(item.get("evidence") or item.get("reason") or value)[:1000],
+            "source_refs": json.dumps(item.get("source_refs") or [], ensure_ascii=False),
+            "supersedes": json.dumps(_as_list(item.get("supersedes")), ensure_ascii=False),
+            "contradiction": str(item.get("contradiction") or "")[:1000],
+        })
+    return out
+
+def _normalize_belief_candidates(summary_struct) -> list[dict]:
+    payload = _safe_json_loads(summary_struct) if isinstance(summary_struct, str) else (summary_struct if isinstance(summary_struct, dict) else {})
+    if not isinstance(payload, dict):
+        return []
+    raw_items = payload.get("belief_candidates") or payload.get("user_belief_candidates") or []
+    out = []
+    seen = set()
+    for raw in _as_list(raw_items):
+        if not isinstance(raw, dict):
+            continue
+        subject = _normalize_user_subject(raw.get("subject") or raw.get("entity") or "haoge")
+        predicate = str(raw.get("predicate") or raw.get("key") or raw.get("state_key") or "state").strip()
+        value = str(raw.get("value") or raw.get("belief") or raw.get("after_value") or raw.get("text") or "").strip()
+        evidence = str(raw.get("evidence") or "").strip()
+        belief_type = _normalize_user_belief_type(raw.get("belief_type") or raw.get("type") or "")
+        if not subject or not predicate or not value or not evidence or not belief_type:
+            continue
+        status = str(raw.get("candidate_status") or raw.get("status") or "pending").strip().lower()
+        if status not in {"pending", "accepted", "rejected"}:
+            status = "pending"
+        key = (subject.lower(), predicate.lower(), value.lower(), belief_type)
+        if key in seen:
+            continue
+        seen.add(key)
+        raw_confidence = float(raw.get("confidence") if raw.get("confidence") is not None else 0.4)
+        if status == "pending":
+            raw_confidence = min(raw_confidence, 0.6)
+        out.append({
+            "subject": subject[:160],
+            "predicate": predicate[:120],
+            "value": value[:500],
+            "belief_type": belief_type,
+            "scope": str(raw.get("scope") or "global")[:120],
+            "candidate_status": status,
+            "confidence": raw_confidence,
+            "evidence": evidence[:1000],
+            "reason": str(raw.get("reason") or "")[:1000],
+            "evidence_count": max(1, int(raw.get("evidence_count") or 1)),
+            "rejection_reason": str(raw.get("rejection_reason") or "")[:1000],
+            "source_refs": json.dumps(raw.get("source_refs") or [], ensure_ascii=False),
+        })
+    return out
+
+def _normalize_causal_events(summary_struct) -> list[dict]:
+    payload = _safe_json_loads(summary_struct) if isinstance(summary_struct, str) else (summary_struct if isinstance(summary_struct, dict) else {})
+    if not isinstance(payload, dict):
+        return []
+    raw_items = payload.get("causal_events") or payload.get("events") or []
+    out = []
+    seen = set()
+    for raw in _as_list(raw_items):
+        if not isinstance(raw, dict):
+            continue
+        actor = str(raw.get("actor") or raw.get("who") or raw.get("person") or "").strip()
+        event = str(raw.get("event") or raw.get("what") or raw.get("action") or "").strip()
+        evidence = str(raw.get("evidence") or raw.get("quote") or event).strip()
+        if not actor or not event or not evidence:
+            continue
+        relation_type = str(raw.get("relation_type") or "causal").strip().lower()
+        if relation_type not in {"causal", "correlation", "conditional", "context"}:
+            relation_type = "causal"
+        strength = str(raw.get("strength") or "weak").strip().lower()
+        if strength not in {"strong", "weak", "unknown"}:
+            strength = "weak"
+        key = (actor.lower(), event.lower(), evidence.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "event_time": str(raw.get("time") or raw.get("event_time") or raw.get("date") or "")[:80],
+            "actor": actor[:160],
+            "event": event[:500],
+            "cause": str(raw.get("cause") or raw.get("why") or "")[:1000],
+            "effect": str(raw.get("effect") or raw.get("result") or "")[:1000],
+            "context": str(raw.get("context") or "")[:1000],
+            "evidence": evidence[:1000],
+            "relation_type": relation_type,
+            "strength": strength,
+            "confidence": float(raw.get("confidence") if raw.get("confidence") is not None else 0.6),
+            "source_refs": json.dumps(raw.get("source_refs") or [], ensure_ascii=False),
+        })
+    return out
+
+def _normalize_state_transitions(summary_struct) -> list[dict]:
+    payload = _safe_json_loads(summary_struct) if isinstance(summary_struct, str) else (summary_struct if isinstance(summary_struct, dict) else {})
+    raw_items = payload.get("state_transitions") or payload.get("transitions") if isinstance(payload, dict) else []
+    out = []
+    seen = set()
+    for raw in _as_list(raw_items):
+        if not isinstance(raw, dict):
+            continue
+        subject = _normalize_user_subject(raw.get("subject") or raw.get("entity") or "haoge")
+        state_key = str(raw.get("state_key") or raw.get("predicate") or raw.get("key") or "state").strip()
+        after_value = str(raw.get("after_value") or raw.get("after") or raw.get("value") or "").strip()
+        if not subject or not state_key or not after_value:
+            continue
+        event_time = str(raw.get("event_time") or raw.get("date") or raw.get("valid_from") or "")[:80]
+        key = (subject.lower(), state_key.lower(), after_value.lower(), event_time)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "subject": subject[:160],
+            "state_key": state_key[:120],
+            "before_value": str(raw.get("before_value") or raw.get("before") or "")[:500],
+            "after_value": after_value[:500],
+            "trigger": str(raw.get("trigger") or raw.get("event") or "")[:500],
+            "reason": str(raw.get("reason") or raw.get("cause") or "")[:1000],
+            "evidence": str(raw.get("evidence") or raw.get("trigger") or after_value)[:1000],
+            "event_time": event_time,
+            "confidence": float(raw.get("confidence") if raw.get("confidence") is not None else 0.6),
+        })
+    return out
+
+def _sync_causal_cognition(conn: sqlite3.Connection, page_id: int, slug: str, summary_struct: dict):
+    events = _normalize_causal_events(summary_struct)
+    beliefs = _normalize_causal_beliefs(summary_struct)
+    candidates = _normalize_belief_candidates(summary_struct)
+    transitions = _normalize_state_transitions(summary_struct)
+    conn.execute("DELETE FROM causal_events WHERE source_slug=?", (slug,))
+    conn.execute("DELETE FROM causal_beliefs WHERE source_slug=?", (slug,))
+    conn.execute("DELETE FROM belief_candidates WHERE source_slug=?", (slug,))
+    conn.execute("DELETE FROM state_transitions WHERE source_slug=?", (slug,))
+    for event in events:
+        conn.execute("""
+            INSERT INTO causal_events
+                (event_time, actor, event, cause, effect, context, evidence, relation_type, strength, confidence,
+                 source_slug, source_refs, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        """, (event["event_time"], event["actor"], event["event"], event["cause"], event["effect"], event["context"],
+              event["evidence"], event["relation_type"], event["strength"], event["confidence"], slug, event["source_refs"]))
+    for belief in beliefs:
+        cur = conn.execute("""
+            INSERT INTO causal_beliefs
+                (subject, predicate, value, belief_type, scope, status, confidence, valid_from, valid_until,
+                 evidence, source_slug, source_refs, supersedes, contradiction, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        """, (belief["subject"], belief["predicate"], belief["value"], belief["belief_type"], belief["scope"],
+              belief["status"], belief["confidence"], belief["valid_from"], belief["valid_until"], belief["evidence"],
+              slug, belief["source_refs"], belief["supersedes"], belief["contradiction"]))
+        if belief["status"] == "active":
+            conn.execute("""
+                UPDATE causal_beliefs
+                SET status='superseded', superseded_by=?, valid_until=COALESCE(NULLIF(?, ''), valid_until), updated_at=datetime('now')
+                WHERE id != ? AND status='active' AND subject=? AND predicate=? AND scope=? AND value != ?
+                  AND COALESCE(confidence, 0.0) <= ?
+            """, (cur.lastrowid, belief["valid_from"], cur.lastrowid, belief["subject"], belief["predicate"], belief["scope"], belief["value"], belief["confidence"]))
+    for candidate in candidates:
+        existing = conn.execute("""
+            SELECT id, confidence, evidence_count, evidence FROM belief_candidates
+            WHERE subject=? AND predicate=? AND value=? AND belief_type=? AND scope=?
+            ORDER BY updated_at DESC LIMIT 1
+        """, (candidate["subject"], candidate["predicate"], candidate["value"], candidate["belief_type"], candidate["scope"])).fetchone()
+        if existing and candidate["candidate_status"] == "pending":
+            seen_evidence = candidate["evidence"] in (existing["evidence"] or "")
+            evidence_count = int(existing["evidence_count"] or 1) + (0 if seen_evidence else candidate["evidence_count"])
+            confidence = min(0.85, max(float(existing["confidence"] or 0), candidate["confidence"]) + (0.05 if not seen_evidence else 0.0))
+            evidence = existing["evidence"] if seen_evidence else f"{existing['evidence']}\n{candidate['evidence']}"[:1000]
+            conn.execute("""
+                UPDATE belief_candidates
+                SET confidence=?, evidence_count=?, evidence=?, reason=?, source_slug=?, source_refs=?, updated_at=datetime('now')
+                WHERE id=?
+            """, (confidence, evidence_count, evidence, candidate["reason"], slug, candidate["source_refs"], existing["id"]))
+            continue
+        conn.execute("""
+            INSERT INTO belief_candidates
+                (subject, predicate, value, belief_type, scope, candidate_status, confidence, evidence, reason,
+                 evidence_count, rejection_reason, source_slug, source_refs, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        """, (candidate["subject"], candidate["predicate"], candidate["value"], candidate["belief_type"], candidate["scope"],
+              candidate["candidate_status"], candidate["confidence"], candidate["evidence"], candidate["reason"],
+              candidate["evidence_count"], candidate["rejection_reason"], slug, candidate["source_refs"]))
+    for transition in transitions:
+        conn.execute("""
+            INSERT INTO state_transitions
+                (subject, state_key, before_value, after_value, trigger, reason, evidence, source_slug, event_time, confidence)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (transition["subject"], transition["state_key"], transition["before_value"], transition["after_value"],
+              transition["trigger"], transition["reason"], transition["evidence"], slug, transition["event_time"], transition["confidence"]))
 
 def _candidate_provenance(raw_event: Optional[sqlite3.Row] = None, extra: Optional[dict] = None) -> str:
     payload = dict(extra or {})
@@ -1085,7 +1496,7 @@ def auto_compress_if_needed(slug: str, title: str):
 def _llm_compress_context(context: str, title: str) -> dict:
     """Compress multiple memories into one structured summary via LLM."""
     api_key = os.environ.get("SILICONFLOW_API_KEY", "")
-    if not api_key:
+    if not api_key or requests is None:
         return {"summary": context[:200], "cause": "", "effect": "", "decided": "", "learned": ""}
 
     prompt = f"""将以下多条关于「{title}」的记忆压缩为一条结构化摘要：
@@ -1284,7 +1695,7 @@ def compress_observation(raw_text: str, obs_type: str = "INSIGHT") -> dict:
     Returns: {decided, learned, completed, next_steps, concepts, cause, effect, emotion}
     """
     api_key = os.environ.get("MINIMAX_API_KEY", "")
-    if not api_key:
+    if not api_key or requests is None:
         return {"decided": raw_text[:100], "learned": "", "completed": "", "next_steps": "",
                 "concepts": [], "cause": "", "effect": "", "emotion": "无",
                 "summary_struct": {"type": obs_type, "raw": raw_text[:200]}}
@@ -1303,9 +1714,15 @@ def compress_observation(raw_text: str, obs_type: str = "INSIGHT") -> dict:
 - cause: 前因——导致这个事件发生的原因链条（按时间倒序排列；每条包含日期或时间线索；不要添加“最新/较早/更早”等相对标签；尽量保留全部关键链条；每条不超过{CAUSAL_ITEM_TEXT_LIMIT}字；保留必要链条结构；没有则写"无"）
 - effect: 后果——这个事件会导致什么后续变化链条（按时间倒序排列；每条包含日期或时间线索；不要添加“最新/较早/更早”等相对标签；尽量保留全部关键链条；每条不超过{CAUSAL_ITEM_TEXT_LIMIT}字；保留必要链条结构；没有则写"无"）
 - emotion: 当前情绪，从以下选一个：开心|低落|饿|饱|累|精神|焦虑|专注|满足|空虚|无
+- causal_events: 时人事因果事件数组。这是核心长期记忆：什么时候(time)、什么人(actor)、做了什么(event)、为什么做(cause)、结果是什么(effect)、当时上下文(context)、原文证据(evidence)。只抽有证据的事件；不知道就留空字符串，不要脑补。
+- belief_candidates: 用户画像候选数组。只从用户明确原话抽取偏好、负向偏好、约束、目标、风格、状态或决定；不能从行为、话题、任务类型或助手建议推断；证据必须逐字来自用户原句；没把握则返回空数组。
+
+causal_events 每项格式：{{"time":"...", "actor":"...", "event":"...", "cause":"...", "effect":"...", "context":"...", "evidence":"原文证据", "relation_type":"causal|correlation|conditional|context", "strength":"strong|weak|unknown", "confidence":0.6}}
+belief_candidates 每项格式：{{"subject":"haoge", "predicate":"...", "value":"...", "belief_type":"user_preference|negative_preference|user_constraint|user_goal|user_style|user_state|user_decision", "scope":"global|current_task", "confidence":0.35, "evidence":"用户原句", "reason":"为什么只是候选"}}
+scope规则：出现“这次/现在/当前任务/这轮”用current_task；出现“以后/默认/长期/一直/我喜欢/我不喜欢/我决定”且表达长期意图才用global；不确定则current_task或不抽。
 
 JSON格式：
-{{"decided":"...", "learned":"...", "completed":"...", "next_steps":"...", "concepts":["...","..."], "cause":"...", "effect":"...", "emotion":"..."}}"""
+{{"decided":"...", "learned":"...", "completed":"...", "next_steps":"...", "concepts":["...","..."], "cause":"...", "effect":"...", "emotion":"...", "causal_events":[], "belief_candidates":[]}}"""
 
     try:
         resp = requests.post(
@@ -1360,7 +1777,13 @@ JSON格式：
                 "cause": cause,
                 "effect": effect,
                 "emotion": data.get("emotion", "无"),
-                "summary_struct": {"type": obs_type, "raw": raw_text[:500], "causal_items": _causal_items_from_fields(cause, effect)}
+                "summary_struct": {
+                    "type": obs_type,
+                    "raw": raw_text[:500],
+                    "causal_items": _causal_items_from_fields(cause, effect),
+                    "causal_events": data.get("causal_events", []),
+                    "belief_candidates": data.get("belief_candidates", []),
+                }
             }
     except Exception as e:
         print(f"[gbrain] compress failed: {e}", file=sys.stderr)
@@ -1390,6 +1813,8 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
     summary_struct = structured.get("summary_struct")
     if not isinstance(summary_struct, dict):
         summary_struct = {"type": obs_type, "raw": content[:500]}
+    if not summary_struct.get("causal_events"):
+        summary_struct["causal_events"] = _fallback_causal_events_from_sections(slug, title, sections)
     summary_struct["causal_items"] = _normalize_causal_items(
         summary_struct,
         structured.get("cause", ""),
@@ -1420,6 +1845,7 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
          structured.get("emotion", "无"), now))
 
     page_id = cursor.execute("SELECT id FROM pages WHERE slug=?", (slug,)).fetchone()[0]
+    _sync_causal_cognition(conn, page_id, slug, summary_struct)
 
     cursor.execute("DELETE FROM page_fts WHERE page_id=?", (page_id,))
     cursor.execute("INSERT INTO page_fts (page_id, slug, title, body) VALUES (?,?,?,?)",
@@ -1475,11 +1901,219 @@ def query_causal(keyword: str, limit: int = 10) -> list[dict]:
     results.sort(key=lambda r: (_jaccard(keyword, " ".join(str(r.get(k) or "") for k in ("slug", "title", "cause", "effect", "evidence"))), float(r.get("confidence") or 0)), reverse=True)
     return results[:limit]
 
+def query_causal_beliefs(question: str, limit: int = 8) -> list[dict]:
+    conn = get_db()
+    terms = _query_terms(question)
+    clauses = []
+    params = []
+    for term in terms[:12]:
+        like = f"%{term}%"
+        clauses.append("(subject LIKE ? OR predicate LIKE ? OR value LIKE ? OR evidence LIKE ? OR contradiction LIKE ?)")
+        params.extend([like] * 5)
+    where = f" AND ({' OR '.join(clauses)})" if clauses else ""
+    rows = conn.execute(f"""
+        SELECT id, subject, predicate, value, belief_type, scope, status, confidence, valid_from, valid_until,
+               evidence, source_slug, superseded_by, contradiction, updated_at
+        FROM causal_beliefs
+        WHERE 1=1{where}
+        ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, confidence DESC, COALESCE(NULLIF(valid_from, ''), updated_at) DESC
+        LIMIT ?
+    """, params + [max(limit * 3, 20)]).fetchall()
+    scored = []
+    for row in rows:
+        item = dict(row)
+        text = " ".join(str(item.get(k) or "") for k in ("subject", "predicate", "value", "evidence", "contradiction"))
+        score = _jaccard(question, text) + float(item.get("confidence") or 0) * 0.25
+        if item.get("status") == "active":
+            score += 0.5
+        scored.append((score, item))
+    conn.close()
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _score, item in scored[:limit]]
+
+def query_belief_candidates(question: str, limit: int = 5) -> list[dict]:
+    conn = get_db()
+    terms = _query_terms(question)
+    clauses = []
+    params = []
+    for term in terms[:12]:
+        like = f"%{term}%"
+        clauses.append("(subject LIKE ? OR predicate LIKE ? OR value LIKE ? OR evidence LIKE ? OR reason LIKE ?)")
+        params.extend([like] * 5)
+    where = f" AND ({' OR '.join(clauses)})" if clauses else ""
+    rows = conn.execute(f"""
+        SELECT id, subject, predicate, value, belief_type, scope, candidate_status, confidence,
+               evidence, reason, evidence_count, rejection_reason, source_slug, updated_at
+        FROM belief_candidates
+        WHERE candidate_status='pending'{where}
+        ORDER BY confidence DESC, updated_at DESC
+        LIMIT ?
+    """, params + [max(limit * 3, 15)]).fetchall()
+    scored = []
+    for row in rows:
+        item = dict(row)
+        text = " ".join(str(item.get(k) or "") for k in ("subject", "predicate", "value", "evidence", "reason"))
+        scored.append((_jaccard(question, text) + float(item.get("confidence") or 0) * 0.2 + min(int(item.get("evidence_count") or 1), 5) * 0.03, item))
+    conn.close()
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _score, item in scored[:limit]]
+
+def query_causal_events(question: str, limit: int = 10) -> list[dict]:
+    conn = get_db()
+    terms = _query_terms(question)
+    clauses = []
+    params = []
+    for term in terms[:12]:
+        like = f"%{term}%"
+        clauses.append("(event_time LIKE ? OR actor LIKE ? OR event LIKE ? OR cause LIKE ? OR effect LIKE ? OR context LIKE ? OR evidence LIKE ?)")
+        params.extend([like] * 7)
+    where = f" AND ({' OR '.join(clauses)})" if clauses else ""
+    rows = conn.execute(f"""
+        SELECT id, event_time, actor, event, cause, effect, context, evidence, relation_type, strength,
+               confidence, source_slug, updated_at
+        FROM causal_events
+        WHERE 1=1{where}
+        ORDER BY COALESCE(NULLIF(event_time, ''), updated_at) DESC, confidence DESC
+        LIMIT ?
+    """, params + [max(limit * 3, 30)]).fetchall()
+    scored = []
+    for row in rows:
+        item = dict(row)
+        text = " ".join(str(item.get(k) or "") for k in ("event_time", "actor", "event", "cause", "effect", "context", "evidence"))
+        scored.append((_jaccard(question, text) + float(item.get("confidence") or 0) * 0.15, item))
+    conn.close()
+    scored.sort(key=lambda x: (x[0], _line_date_key(x[1].get("event_time") or "")), reverse=True)
+    return [item for _score, item in scored[:limit]]
+
+def reject_belief_candidate(candidate_id: int, reason: str, evidence: str = "") -> bool:
+    conn = get_db()
+    cur = conn.execute("""
+        UPDATE belief_candidates
+        SET candidate_status='rejected', rejection_reason=?, reason=COALESCE(NULLIF(?, ''), reason), updated_at=datetime('now')
+        WHERE id=? AND candidate_status!='rejected'
+    """, (reason[:1000], evidence[:1000], candidate_id))
+    conn.commit()
+    changed = cur.rowcount > 0
+    conn.close()
+    return changed
+
+def reject_causal_belief(belief_id: int, reason: str, evidence: str = "") -> bool:
+    conn = get_db()
+    note = reason[:1000]
+    if evidence:
+        note = f"{note}；纠正证据：{evidence[:500]}"
+    cur = conn.execute("""
+        UPDATE causal_beliefs
+        SET status='rejected', contradiction=?, valid_until=COALESCE(NULLIF(valid_until, ''), datetime('now')), updated_at=datetime('now')
+        WHERE id=? AND status!='rejected'
+    """, (note, belief_id))
+    conn.commit()
+    changed = cur.rowcount > 0
+    conn.close()
+    return changed
+
+def query_state_transitions(question: str, limit: int = 8) -> list[dict]:
+    conn = get_db()
+    terms = _query_terms(question)
+    clauses = []
+    params = []
+    for term in terms[:12]:
+        like = f"%{term}%"
+        clauses.append("(subject LIKE ? OR state_key LIKE ? OR before_value LIKE ? OR after_value LIKE ? OR trigger LIKE ? OR reason LIKE ? OR evidence LIKE ?)")
+        params.extend([like] * 7)
+    where = f" AND ({' OR '.join(clauses)})" if clauses else ""
+    rows = conn.execute(f"""
+        SELECT subject, state_key, before_value, after_value, trigger, reason, evidence, source_slug, event_time, confidence
+        FROM state_transitions
+        WHERE 1=1{where}
+        ORDER BY COALESCE(NULLIF(event_time, ''), created_at) DESC, confidence DESC
+        LIMIT ?
+    """, params + [max(limit * 3, 20)]).fetchall()
+    scored = []
+    for row in rows:
+        item = dict(row)
+        text = " ".join(str(item.get(k) or "") for k in ("subject", "state_key", "before_value", "after_value", "trigger", "reason", "evidence"))
+        scored.append((_jaccard(question, text) + float(item.get("confidence") or 0) * 0.2, item))
+    conn.close()
+    scored.sort(key=lambda x: (_line_date_key(x[1].get("event_time") or ""), x[0]), reverse=True)
+    return [item for _score, item in scored[:limit]]
+
+def _belief_anchor_lines(question: str, limit: int = 8) -> list[str]:
+    lines = []
+    for item in query_causal_beliefs(question, limit):
+        status = "当前" if item.get("status") == "active" else "已被推翻"
+        parts = [f"[{item.get('source_slug') or 'belief'}] {status}画像：{item.get('subject')} {item.get('predicate')} = {item.get('value')}"]
+        if item.get("valid_from"):
+            parts.append(f"生效：{item['valid_from']}")
+        if item.get("confidence") is not None:
+            parts.append(f"置信度：{float(item.get('confidence') or 0):.2f}")
+        if item.get("evidence_count"):
+            parts.append(f"证据次数：{int(item.get('evidence_count') or 1)}")
+        if item.get("evidence"):
+            parts.append(f"证据：{item['evidence']}")
+        if item.get("contradiction"):
+            parts.append(f"冲突：{item['contradiction']}")
+        lines.append("；".join(parts))
+    return _unique_lines(lines, limit)
+
+def _causal_event_anchor_lines(question: str, limit: int = 10) -> list[str]:
+    lines = []
+    for item in query_causal_events(question, limit):
+        time_part = item.get("event_time") or "时间待核实"
+        actor = item.get("actor") or "人物待核实"
+        event = item.get("event") or "事件待核实"
+        cause = item.get("cause") or "原因待核实"
+        effect = item.get("effect") or "结果待核实"
+        line = f"[{item.get('source_slug') or 'event'}] 时：{time_part}；人：{actor}；事：{event}；因：{cause}；果：{effect}"
+        extras = []
+        if item.get("context"):
+            extras.append(f"上下文：{item['context']}")
+        if item.get("relation_type") or item.get("strength"):
+            extras.append(f"关系：{item.get('relation_type') or 'causal'}/{item.get('strength') or 'weak'}")
+        if item.get("evidence"):
+            extras.append(f"证据：{item['evidence']}")
+        if extras:
+            line = f"{line}；" + "；".join(extras)
+        lines.append(line)
+    return _unique_lines(lines, limit)
+
+def _belief_candidate_anchor_lines(question: str, limit: int = 5) -> list[str]:
+    lines = []
+    for item in query_belief_candidates(question, limit):
+        parts = [f"[{item.get('source_slug') or 'candidate'}] 待确认画像：{item.get('subject')} {item.get('predicate')} = {item.get('value')}"]
+        if item.get("confidence") is not None:
+            parts.append(f"置信度：{float(item.get('confidence') or 0):.2f}")
+        if item.get("evidence"):
+            parts.append(f"证据：{item['evidence']}")
+        if item.get("reason"):
+            parts.append(f"原因：{item['reason']}")
+        lines.append("；".join(parts))
+    return _unique_lines(lines, limit)
+
+def _transition_anchor_lines(question: str, limit: int = 8) -> list[str]:
+    lines = []
+    for item in query_state_transitions(question, limit):
+        before = item.get("before_value") or "未知"
+        after = item.get("after_value") or "未知"
+        date = f"{item['event_time']} " if item.get("event_time") else ""
+        line = f"[{item.get('source_slug') or 'transition'}] {date}{item.get('subject')} 的用户状态 {item.get('state_key')}：{before} -> {after}"
+        extras = []
+        if item.get("trigger"):
+            extras.append(f"触发：{item['trigger']}")
+        if item.get("reason"):
+            extras.append(f"原因：{item['reason']}")
+        if item.get("evidence"):
+            extras.append(f"证据：{item['evidence']}")
+        if extras:
+            line = f"{line}；" + "；".join(extras)
+        lines.append(line)
+    return _unique_lines(lines, limit)
+
 # ── Tag Auto-Extract (SPlus-inspired) ───────────────────────────────────────
 def extract_and_set_tags(page_id: int, content: str):
     """Auto-extract tags from content using LLM (SPlus auto-tagging)."""
     api_key = os.environ.get("SILICONFLOW_API_KEY", "")
-    if not api_key:
+    if not api_key or requests is None:
         return
     prompt = f"从以下内容提取2-4个标签词（只用中文单词，逗号分隔，不需要解释）：\n{content[:300]}"
     try:
@@ -1843,21 +2477,6 @@ def _line_date_key(line: str) -> str:
 def _anchor_structured_lines(question: str, keys: tuple[str, ...], limit: int = 8) -> list[str]:
     conn = get_db()
     terms = _query_terms(question)
-    q = question.lower()
-    synonym_groups = {
-        ("doctor", "doctors", "physician"): ["dr", "doctor", "physician", "specialist", "dermatologist", "ent", "primary care"],
-        ("clothing", "clothes", "store", "pick", "return"): ["boots", "zara", "blazer", "jeans", "dry cleaning", "alterations", "pick up", "return", "returned", "exchanged"],
-        ("model", "kits", "kit"): ["model", "kit", "kits", "scale", "revell", "tamiya", "bomber", "camaro", "spitfire", "tiger"],
-        ("projects", "project", "led", "leading"): ["project", "led", "leading", "team", "launch", "currently leading"],
-        ("restaurant", "restaurants", "korean"): ["korean", "restaurant", "restaurants", "tried"],
-        ("bike", "bikes"): ["bike", "bikes", "bicycle", "cycling"],
-        ("moved", "relocation", "rachel"): ["rachel", "moved", "move", "relocation", "suburbs", "city", "chicago"],
-        ("days", "weeks", "months", "hours"): ["day", "days", "week", "weeks", "month", "months", "hour", "hours", "ago", "passed"],
-        ("camping", "camp"): ["camping", "camp", "trip", "yellowstone", "big sur", "day", "days"],
-    }
-    for triggers, values in synonym_groups.items():
-        if any(t in q for t in triggers):
-            terms.extend(values)
     terms = list(dict.fromkeys([t.lower() for t in terms if t]))
     clauses = []
     params = []
@@ -1960,6 +2579,7 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
             field_lines.append(f"[{slug}] {label}：{item['text']}")
     anchor_budget = {
         "direct_evidence": max(8, limit * 2),
+        "causal_events": max(8, limit * 2),
         "timeline": max(8, limit * 2),
         "causal_chain": max(6, limit),
         "aggregation_candidates": max(4, limit),
@@ -1967,6 +2587,10 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
         "proposed_answer": 1,
     }
     causal_lines = _rank_causal_anchor_lines(question, field_lines, trace, anchor_budget["causal_chain"])
+    event_lines = _causal_event_anchor_lines(question, anchor_budget["causal_events"])
+    belief_lines = _belief_anchor_lines(question, max(6, limit))
+    belief_candidate_lines = _belief_candidate_anchor_lines(question, max(3, limit // 2 + 1))
+    transition_lines = _transition_anchor_lines(question, max(6, limit))
     direct_evidence = _anchor_structured_lines(question, ("direct_evidence", "memory_atoms"), anchor_budget["direct_evidence"])
     aggregation_candidates = _anchor_structured_lines(question, ("aggregation_candidates",), anchor_budget["aggregation_candidates"])
     timeline = _anchor_structured_lines(question, ("timeline",), anchor_budget["timeline"])
@@ -1996,14 +2620,22 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
             "规则": rules,
             "历史决策": decisions,
             "直接证据": direct_evidence,
+            "时人事因果": event_lines,
             "聚合候选": aggregation_candidates,
             "时间线": timeline,
             "答案草稿": answer_plan,
             "建议答案": proposed_answers,
             "因果链": causal_lines,
+            "意图/偏好线索": belief_lines,
+            "待确认意图/偏好线索": belief_candidate_lines,
+            "用户状态变化": transition_lines,
             "执行状态": execution_status[:limit],
             "判断约束": [
-                "不要直接猜；先依据事实、规则、历史决策、直接证据、时间线和因果链判断。",
+                "不要直接猜；先依据时人事因果、直接证据、时间线、因果链、上下文和状态变化判断。",
+                "意图/偏好线索只用于辅助解释，不能替代时人事因果事件链。",
+                "待确认意图/偏好线索只能作为提醒，不能当作事实；必须有进一步证据或确认后才能采用。",
+                "涉及人物是谁、想要什么、为什么这么做时，先拉取该人物的时人事因果链，再由模型判断。",
+                "涉及用户状态变化时，沿用户状态变化判断 before -> after、触发事件和原因。",
                 "答案草稿/建议答案只可作为低权重假设；必须被直接证据和时间线支持后才能采用。",
                 "时间冲突时优先使用带日期的较新直接证据；不能让答案草稿覆盖时间链。",
                 "缺少证据时标记“待核实”。",
@@ -2019,7 +2651,7 @@ def build_cognitive_anchor(question: str, limit: int = 5, beads_cwd: Optional[st
 
 def _print_anchor(anchor: dict):
     print("<causamem-cognitive-anchor>")
-    for key in ("事实", "规则", "历史决策", "直接证据", "聚合候选", "时间线", "答案草稿", "建议答案", "因果链", "执行状态", "判断约束"):
+    for key in ("事实", "规则", "历史决策", "直接证据", "时人事因果", "聚合候选", "时间线", "答案草稿", "建议答案", "因果链", "意图/偏好线索", "待确认意图/偏好线索", "用户状态变化", "执行状态", "判断约束"):
         print(f"{key}：")
         values = anchor.get("anchor", {}).get(key, [])
         if values:

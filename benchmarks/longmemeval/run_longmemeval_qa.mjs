@@ -165,7 +165,7 @@ function buildRealCausaMemContext(item) {
   }
   const anchor = JSON.parse(res.stdout);
   const body = anchor.anchor || anchor;
-  const sections = ['事实', '规则', '历史决策', '直接证据', '聚合候选', '时间线', '答案草稿', '建议答案', '因果链', '执行状态', '判断约束']
+  const sections = ['事实', '规则', '历史决策', '直接证据', '时人事因果', '聚合候选', '时间线', '答案草稿', '建议答案', '因果链', '意图/偏好线索', '待确认意图/偏好线索', '用户状态变化', '执行状态', '判断约束']
     .map(key => {
       const values = Array.isArray(body[key]) ? body[key] : [];
       return `${key}:\n${values.length ? values.map(v => `- ${v}`).join('\n') : '- 待核实'}`;
@@ -173,7 +173,8 @@ function buildRealCausaMemContext(item) {
     .join('\n\n');
   const policy = [
     'I7 policy:',
-    '- 直接证据, 时间线, 因果链 are authoritative memory evidence.',
+    '- 时人事因果, 直接证据, 时间线, 因果链 are authoritative memory evidence.',
+    '- 意图/偏好线索 and 待确认意图/偏好线索 are weak explanatory hints; do not treat them as facts without supporting event evidence.',
     '- 答案草稿 and 建议答案 are low-priority hypotheses only.',
     '- Do not answer from 答案草稿/建议答案 unless supported by 直接证据 or 时间线.',
   ].join('\n');
@@ -209,7 +210,7 @@ function buildPrompt(item) {
           ? `${realCausaMem}\n\nHistory Chats:\n\n${chunks}`
           : `History Chats:\n\n${chunks}`;
   const causamemHint = ['real_causamem', 'bm25+real_causamem'].includes(contextMode)
-    ? 'Use 直接证据, 时间线, and 因果链 as primary evidence. Treat 答案草稿 and 建议答案 only as low-priority hypotheses; ignore them if not directly supported by evidence.'
+    ? 'Use 时人事因果, 直接证据, 时间线, and 因果链 as primary evidence. Treat 意图/偏好线索 and 待确认意图/偏好线索 only as weak explanatory hints. Treat 答案草稿 and 建议答案 only as low-priority hypotheses; ignore them if not directly supported by evidence.'
     : '';
   return `Question: ${item.question}\nCurrent Date: ${item.question_date}\nQuestion Type: ${item.question_type || 'unknown'}\n\nI will give you memory context between you and a user. Please answer the question above based only on the provided memory context. Give a concise direct answer. ${abstentionHint} ${taskHint} ${causamemHint}\n\n${history}\n\nAnswer:`;
 }

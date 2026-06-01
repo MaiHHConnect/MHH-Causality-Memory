@@ -77,6 +77,32 @@ class D5DreamTest(unittest.TestCase):
         self.assertEqual(refs[0]["date"], "2026-05-31")
         self.assertTrue(refs[0]["path"].endswith("2026-05-31.md"))
 
+    def test_build_dream_structured_extracts_profile_candidate_review(self):
+        summary = """## 待确认画像建议
+- answer_style：保留；证据：用户说“以后先给结论”
+
+## 因果串线
+- A -> B
+"""
+
+        structured = dream.build_dream_structured(summary, "2026-06-01", ["2026-05-31"])
+
+        review = structured["summary_struct"]["profile_candidate_review"]
+        self.assertEqual(review, ["answer_style：保留；证据：用户说“以后先给结论”"])
+
+    def test_build_dream_structured_extracts_five_core_events(self):
+        summary = """## 时人事因果
+- 时：2026-06-01；人：小明；事：提交修复；因：线上失败；果：服务恢复
+
+## 因果串线
+- 2026-06-01 线上失败 -> 小明修复 -> 服务恢复
+"""
+
+        structured = dream.build_dream_structured(summary, "2026-06-01", ["2026-06-01"])
+
+        events = structured["summary_struct"]["five_core_events"]
+        self.assertEqual(events, ["时：2026-06-01；人：小明；事：提交修复；因：线上失败；果：服务恢复"])
+
     def test_run_big_dream_writes_deterministic_cause_to_gbrain(self):
         date = "2026-05-31"
         with open(os.path.join(self.memory_dir, f"{date}.md"), "w") as fh:
@@ -116,6 +142,27 @@ class D5DreamTest(unittest.TestCase):
             body = fh.read()
         self.assertIn("source_refs:", body)
         self.assertIn("type: memory_file", body)
+
+    def test_generate_dream_summary_prompt_limits_profile_review_to_cleanup(self):
+        class FakeResponse:
+            def json(self):
+                return {"choices": [{"message": {"content": "## 待确认画像建议\n- 无"}}]}
+
+        captured = {}
+
+        def fake_post(url, headers=None, json=None, timeout=None):
+            captured["json"] = json
+            return FakeResponse()
+
+        with patch("requests.post", side_effect=fake_post):
+            dream.generate_dream_summary("用户说：以后先给结论", "test-key")
+
+        prompt = captured["json"]["messages"][0]["content"]
+        self.assertIn("## 时人事因果", prompt)
+        self.assertIn("时人事因果是长期记忆核心", prompt)
+        self.assertIn("画像候选清理规则", prompt)
+        self.assertIn("只清理和建议，不要确认成 active 画像", prompt)
+        self.assertIn("不要覆盖", prompt)
 
     def test_structured_override_replaces_old_dream_causal_chain(self):
         first = dream.build_dream_structured("## 因果串线\n- 2026-05-31 old -> stale\n", "2026-06-01", ["2026-05-31"])

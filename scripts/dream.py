@@ -44,10 +44,12 @@ def extract_section_lines(markdown: str, heading: str) -> list[str]:
 
 
 def build_dream_structured(summary: str, date_str: str, dates: list[str]) -> dict:
+    five_core_events = extract_section_lines(summary, "时人事因果")
     causal_chains = extract_section_lines(summary, "因果串线")
     future_hints = extract_section_lines(summary, "对未来的暗示")
     relation_findings = extract_section_lines(summary, "关系发现")
     stage_judgment = extract_section_lines(summary, "阶段判断")
+    profile_reviews = extract_section_lines(summary, "待确认画像建议")
     source_refs = [
         {"type": "memory_file", "date": d, "path": os.path.join(MEMORY_DIR, f"{d}.md")}
         for d in dates
@@ -69,8 +71,10 @@ def build_dream_structured(summary: str, date_str: str, dates: list[str]) -> dic
             "source_refs": source_refs,
             "relation_findings": relation_findings,
             "stage_judgment": stage_judgment,
+            "five_core_events": five_core_events,
             "causal_chains": causal_chains,
             "future_hints": future_hints,
+            "profile_candidate_review": profile_reviews,
         },
     }
 
@@ -181,10 +185,22 @@ def generate_dream_summary(content: str, api_key: str) -> str:
 ## 阶段判断
 - [项目名]：当前阶段：[判断]
 
+## 时人事因果
+- 时：[日期/时间线索]；人：[人物/系统]；事：[做了什么]；因：[为什么做]；果：[结果是什么]
+
+时人事因果是长期记忆核心，只记录有证据的事件；不知道的字段写“待核实”，不要脑补。
+做梦层负责整理质量：统一同一概念的不同说法（如 Dreaming/做梦/睡眠记忆整理），但不要编造新事件；删除“OpenClaw memory YYYY-MM-DD”这类纯标题事件；把长段落拆成多个独立事件；合并重复事件；优先保留能回答“什么时候、谁、做了什么、为什么、结果”的事件。
+检索层已有向量和文本搜索，不要为了检索制造同义词清单；这里输出干净链条即可。
+
 ## 因果串线
 - 事件A → 事件B → 事件C
 
 因果串线按时间倒序排列，每条包含日期或时间线索，不要添加“最新/较早/更早”等相对标签；尽量保留全部关键链条；每条不超过 {CAUSAL_ITEM_TEXT_LIMIT} 字；条数不限；保留必要链条结构，不要强行改成 A → B。
+
+## 待确认画像建议
+- [候选画像]：[保留/合并/冲突/删除建议]；证据：[用户原句或来源]
+
+画像候选清理规则：画像只是意图/偏好线索，不是主系统；只清理和建议，不要确认成 active 画像；合并重复候选；删除无用户原句证据、从行为/话题推断、从助手建议推断的候选；发现与既有偏好冲突时标记“冲突”，不要覆盖。
 
 ## 对未来的暗示
 - [可操作的下一步]
@@ -214,6 +230,12 @@ def generate_fallback_summary(content: str) -> str:
 
 ## 因果串线
 （需要配置 MINIMAX_API_KEY 才能生成；按时间倒序排列，每条带日期或时间线索，每条200字内，条数不限）
+
+## 时人事因果
+（无 API key，未提炼时人事因果事件）
+
+## 待确认画像建议
+（无 API key，未清理候选画像）
 """
 
 
