@@ -1798,7 +1798,9 @@ JSON格式：
 def put_page_structured(slug: str, content: str, page_type: str = "note",
                         title: Optional[str] = None, obs_type: str = "INSIGHT",
                         structured_override: Optional[dict] = None,
-                        merge_causal: bool = True):
+                        merge_causal: bool = True,
+                        source: str = "gbrain",
+                        agent_id: Optional[str] = None):
     """Create/update with AI compression + MemGPT auto-compress."""
     structured = structured_override or compress_observation(content, obs_type)
     conn = get_db()
@@ -1828,9 +1830,9 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
 
     cursor.execute("""
         INSERT INTO pages (slug, type, title, compiled_truth, timeline,
-                         summary_struct, concepts, decided, learned, completed, next_steps,
-                         cause, effect, emotion, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          summary_struct, concepts, decided, learned, completed, next_steps,
+                          cause, effect, emotion, source, agent_id, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(slug) DO UPDATE SET
             type=excluded.type, title=excluded.title,
             compiled_truth=excluded.compiled_truth, timeline=excluded.timeline,
@@ -1838,13 +1840,14 @@ def put_page_structured(slug: str, content: str, page_type: str = "note",
             decided=excluded.decided, learned=excluded.learned,
             completed=excluded.completed, next_steps=excluded.next_steps,
             cause=excluded.cause, effect=excluded.effect,
-            emotion=excluded.emotion, updated_at=excluded.updated_at""",
+            emotion=excluded.emotion, source=excluded.source,
+            agent_id=excluded.agent_id, updated_at=excluded.updated_at""",
         (slug, page_type, title, compiled, timeline,
          summary_json, concepts_json,
          structured["decided"], structured["learned"],
          structured["completed"], structured["next_steps"],
          structured.get("cause", ""), structured.get("effect", ""),
-         structured.get("emotion", "无"), now))
+         structured.get("emotion", "无"), source, agent_id, now))
 
     page_id = cursor.execute("SELECT id FROM pages WHERE slug=?", (slug,)).fetchone()[0]
     _sync_causal_cognition(conn, page_id, slug, summary_struct)

@@ -72,6 +72,25 @@ class CausalChainTest(unittest.TestCase):
         self.assertEqual(row[0].splitlines(), ["2026-06-01 新原因 -> 新结果", "2026-05-01 旧原因 -> 旧结果"])
         self.assertEqual(row[1].splitlines(), ["2026-06-01 新结果 -> 新行动", "2026-05-01 旧结果 -> 旧行动"])
 
+    def test_put_page_structured_persists_source_and_agent_id(self):
+        structured = self._structured("2026-06-01 A -> B", "2026-06-01 B -> C")
+
+        with patch.object(gbrain, "compress_observation", return_value=structured), \
+             patch.object(gbrain, "_embed_page_async"):
+            gbrain.put_page_structured(
+                "bridge-page",
+                "bridge content",
+                title="bridge",
+                source="wiki_dream_bridge",
+                agent_id="ai666",
+            )
+
+        conn = sqlite3.connect(self.db_path)
+        row = conn.execute("SELECT source, agent_id FROM pages WHERE slug='bridge-page'").fetchone()
+        conn.close()
+
+        self.assertEqual(row, ("wiki_dream_bridge", "ai666"))
+
     def test_rebuild_causal_edges_creates_edge_per_chain_item(self):
         conn = gbrain.get_db()
         cur = conn.execute("""
