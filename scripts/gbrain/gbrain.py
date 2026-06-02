@@ -1567,6 +1567,8 @@ def put_page(slug: str, content: str, page_type: str = "note", title: Optional[s
     return page_id
 
 def _embed_page_async(page_id: int, text: str):
+    if requests is None:
+        return
     try:
         emb = get_embedding(text[:3000])
         conn = get_db()
